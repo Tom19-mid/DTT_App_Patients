@@ -2,14 +2,17 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../constants/theme';
+import { useSettings } from '../context/SettingsContext';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
 }
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
+  const { isDarkMode, setIsDarkMode, language, setLanguage } = useSettings();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: '#111827' }]}>
       <KeyboardAvoidingView 
         style={styles.container} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -18,23 +21,32 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
           
           {/* Top Right Controls */}
           <View style={styles.topControls}>
-            <View style={[styles.langToggle, SHADOWS.input]}>
-              <TouchableOpacity style={styles.langBtnActive}>
-                <Text style={styles.langTextActive}>VI</Text>
+            <View style={[styles.langToggle, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]}>
+              <TouchableOpacity 
+                style={[styles.langBtnActive, language === 'en' && styles.langBtnInactive, language === 'vi' && isDarkMode && { backgroundColor: '#1F2937' }]}
+                onPress={() => setLanguage('vi')}
+              >
+                <Text style={[styles.langTextActive, language === 'en' && styles.langTextInactive, isDarkMode && language === 'vi' && { color: '#F3F4F6' }]}>VI</Text>
               </TouchableOpacity>
-              <View style={styles.divider} />
-              <TouchableOpacity style={styles.langBtnInactive}>
-                <Text style={styles.langTextInactive}>EN</Text>
+              <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
+              <TouchableOpacity 
+                style={[styles.langBtnInactive, language === 'en' && styles.langBtnActive, language === 'en' && isDarkMode && { backgroundColor: '#1F2937' }]}
+                onPress={() => setLanguage('en')}
+              >
+                <Text style={[styles.langTextInactive, language === 'en' && styles.langTextActive, isDarkMode && language === 'en' && { color: '#F3F4F6' }]}>EN</Text>
               </TouchableOpacity>
             </View>
             
-            <TouchableOpacity style={[styles.themeToggle, SHADOWS.input]}>
-              <Ionicons name="moon-outline" size={20} color={COLORS.text} />
+            <TouchableOpacity 
+              style={[styles.themeToggle, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]}
+              onPress={() => setIsDarkMode(!isDarkMode)}
+            >
+              <Ionicons name={isDarkMode ? "sunny-outline" : "moon-outline"} size={20} color={isDarkMode ? '#FBBF24' : COLORS.text} />
             </TouchableOpacity>
           </View>
 
           {/* Main Card */}
-          <View style={[styles.card, SHADOWS.card]}>
+          <View style={[styles.card, SHADOWS.card, isDarkMode && { backgroundColor: '#1F2937' }]}>
             {/* Real Logo */}
           <View style={styles.logoContainer}>
             <Image 

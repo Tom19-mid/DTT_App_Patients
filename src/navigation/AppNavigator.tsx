@@ -6,6 +6,7 @@ import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/b
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
+import { useSettings } from '../context/SettingsContext';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -15,6 +16,20 @@ import NotificationScreen from '../screens/NotificationScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import OTPScreen from '../screens/OTPScreen';
+import BookingScreen from '../screens/BookingScreen';
+import AppointmentDetailScreen from '../screens/AppointmentDetailScreen';
+import PackagesScreen from '../screens/PackagesScreen';
+import ConfirmBookingScreen from '../screens/ConfirmBookingScreen';
+import MedicalRecordsScreen from '../screens/MedicalRecordsScreen';
+import SpecialtyDoctorsScreen from '../screens/SpecialtyDoctorsScreen';
+import DocumentViewerScreen from '../screens/DocumentViewerScreen';
+import AccountSettingsScreen from '../screens/AccountSettingsScreen';
+import PatientProfilesScreen from '../screens/PatientProfilesScreen';
+import ProfileDetailScreen from '../screens/ProfileDetailScreen';
+import SupportScreen from '../screens/SupportScreen';
+import GeneralSettingsScreen from '../screens/GeneralSettingsScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -31,10 +46,11 @@ const iconMap: Record<string, { focused: string; outline: string }> = {
 
 const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
+  const { isDarkMode } = useSettings();
 
   return (
     <View style={[styles.tabBarWrapper, { bottom: Math.max(insets.bottom + 8, 20) }]}>
-      <View style={styles.tabBarPill}>
+      <View style={[styles.tabBarPill, isDarkMode && { backgroundColor: '#1F2937' }]}>
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
           const icons = iconMap[route.name] ?? { focused: 'ellipse', outline: 'ellipse-outline' };
@@ -47,11 +63,11 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
               onPress={() => navigation.navigate(route.name)}
               activeOpacity={0.7}
             >
-              <View style={[styles.iconContainer, isFocused && styles.activeTab]}>
+              <View style={[styles.iconContainer, isFocused && [styles.activeTab, isDarkMode && { backgroundColor: '#374151' }]]}>
                 <Ionicons
                   name={iconName}
                   size={24}
-                  color={isFocused ? COLORS.text : COLORS.placeholder}
+                  color={isFocused ? (isDarkMode ? '#60A5FA' : COLORS.text) : (isDarkMode ? '#9CA3AF' : COLORS.placeholder)}
                 />
               </View>
             </TouchableOpacity>
@@ -82,7 +98,21 @@ const AppNavigator = () => {
       <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="OTP" component={OTPScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen name="Booking" component={BookingScreen} />
+        <Stack.Screen name="Packages" component={PackagesScreen} />
+        <Stack.Screen name="ConfirmBooking" component={ConfirmBookingScreen} />
+        <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
+        <Stack.Screen name="MedicalRecords" component={MedicalRecordsScreen} />
+        <Stack.Screen name="SpecialtyDoctors" component={SpecialtyDoctorsScreen} />
+        <Stack.Screen name="DocumentViewer" component={DocumentViewerScreen} />
+        <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+        <Stack.Screen name="PatientProfiles" component={PatientProfilesScreen} />
+        <Stack.Screen name="ProfileDetail" component={ProfileDetailScreen} />
+        <Stack.Screen name="Support" component={SupportScreen} />
+        <Stack.Screen name="GeneralSettings" component={GeneralSettingsScreen} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
       </Stack.Navigator>
     </NavigationContainer>

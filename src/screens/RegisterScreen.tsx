@@ -4,30 +4,34 @@ import AuthLayout from '../components/AuthLayout';
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
 import { COLORS } from '../constants/theme';
+import { useSettings } from '../context/SettingsContext';
 
 const RegisterScreen = ({ navigation }: any) => {
+  const { isDarkMode, t } = useSettings();
+
   return (
     <AuthLayout>
       <View style={styles.formContainer}>
-        <CustomInput placeholder="Số điện thoại" keyboardType="phone-pad" />
-        <CustomInput placeholder="Mật khẩu" secureTextEntry />
-        <CustomInput placeholder="Xác nhận mật khẩu" secureTextEntry />
+        <CustomInput placeholder={t('phone_placeholder')} keyboardType="phone-pad" />
+        <CustomInput placeholder={t('email')} keyboardType="email-address" autoCapitalize="none" />
+        <CustomInput placeholder={t('password_placeholder')} secureTextEntry />
+        <CustomInput placeholder={t('confirm_password_placeholder')} secureTextEntry />
         
         <CustomButton 
-          title="Đăng ký" 
-          onPress={() => {}} 
+          title={t('register_btn')} 
+          onPress={() => navigation.navigate('OTP')} 
           style={styles.registerBtn}
         />
 
         <View style={styles.bottomLinks}>
-          <Text style={styles.linkPrompt}>Đã có tài khoản? </Text>
+          <Text style={[styles.linkPrompt, isDarkMode && { color: '#D1D5DB' }]}>{t('have_account')}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.linkText}>Đăng nhập</Text>
+            <Text style={[styles.linkText, isDarkMode && { color: '#60A5FA' }]}>{t('login_btn')}</Text>
           </TouchableOpacity>
         </View>
         
         <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotPassBtn}>
-          <Text style={styles.forgotPassText}>Quên mật khẩu?</Text>
+          <Text style={[styles.forgotPassText, isDarkMode && { color: '#D1D5DB' }]}>{t('forgot_password_btn')}</Text>
         </TouchableOpacity>
       </View>
     </AuthLayout>
