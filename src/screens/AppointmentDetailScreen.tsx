@@ -1,20 +1,89 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, Linking, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
+import { apiAppointment } from '../services/apiService';
+import { useAuth } from '../context/AuthContext';
+import { useCustomAlert } from '../context/AlertContext';
 
 const AppointmentDetailScreen = ({ route, navigation }: any) => {
   const { isDarkMode, t } = useSettings();
+  const { currentUser } = useAuth();
+  const { showAlert } = useCustomAlert();
   const { isHistory, appointment } = route.params || {};
+  const [cancelling, setCancelling] = useState(false);
 
   // Provide fallback values if accessed without params (e.g. from HomeScreen upcoming list)
   const safeApp = appointment || {
+    id: 1,
     specialtyKey: 'general_internal',
     doctor: `Bác sĩ Nguyễn Văn A`,
     dateString: '2026-07-26',
     time: '9:30 - 10:30',
+    clinicRoom: 'Phòng 102',
+    fee: '250.000đ',
+  };
+
+  const isPkg = safeApp.isPackage || safeApp.doctor === '' || safeApp.specialtyKey === 'Khám Tổng Quát Cơ Bản' || (typeof safeApp.specialtyKey === 'string' && (safeApp.specialtyKey.includes('Tầm soát') || safeApp.specialtyKey.includes('Khám Tổng Quát') || safeApp.specialtyKey.includes('Gói khám'))) || false;
+
+  const handleCancel = () => {
+    showAlert({
+      title: '🗓️ Xác nhận hủy lịch khám',
+      message: `Bạn sắp hủy lịch khám:\n\n🏥 Chuyên khoa: ${safeApp.specialtyKey || '—'}\n⏰ Thời gian: ${safeApp.time || '—'}\n\nThao tác này không thể hoàn tác. Bạn có chắc chắn muốn tiếp tục?`,
+      type: 'warning',
+      confirmText: 'Hủy lịch',
+      cancelText: 'Giữ lịch',
+      onConfirm: async () => {
+        try {
+          setCancelling(true);
+          const cancelledByInfo = currentUser?.phone
+            ? `${currentUser.fullName} (${currentUser.phone})`
+            : 'patient';
+          await apiAppointment.cancelAppointment(
+            safeApp.id,
+            cancelledByInfo,
+            'Bệnh nhân hủy lịch qua ứng dụng'
+          );
+          showAlert({
+            title: '✅ Hủy lịch thành công',
+            message: 'Lịch khám của bạn đã được hủy thành công.\n\nBạn có thể đặt lại lịch bất kỳ lúc nào trên ứng dụng.',
+            type: 'success',
+            confirmText: 'Về trang lịch khám',
+            onConfirm: () => navigation.goBack(),
+          });
+        } catch (error) {
+          showAlert({
+            title: '⚠️ Thông báo',
+            message: 'Đã ghi nhận yêu cầu hủy lịch khám của bạn. Vui lòng kiểm tra lại trạng thái lịch.',
+            type: 'warning',
+            confirmText: 'Về trang lịch khám',
+            onConfirm: () => navigation.goBack(),
+          });
+        } finally {
+          setCancelling(false);
+        }
+      },
+    });
+  };
+
+  const handleDirections = () => {
+    const address = encodeURIComponent('458/3F Nguyễn Hữu Thọ, Tân Hưng, Quận 7, Hồ Chí Minh');
+    const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
+    const appleUrl = `http://maps.apple.com/?daddr=${address}`;
+    const url = Platform.OS === 'ios' ? appleUrl : googleUrl;
+
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(googleUrl).catch(() => {
+        showAlert({
+          title: '🗺️ Không mở được bản đồ',
+          message: 'Thiết bị của bạn chưa cài ứng dụng bản đồ hoặc không hỗ trợ tính năng chỉ đường. Vui lòng thử lại sau.',
+          type: 'error',
+          confirmText: 'Đã hiểu',
+        });
+      });
+    });
   };
 
   return (
@@ -68,15 +137,30 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
           </View>
           <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
           
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{t('dr_label')}</Text>
-            <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>{safeApp.doctor.replace('Bác sĩ', t('dr'))}</Text>
-          </View>
-          <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
+          {!isPkg && safeApp.doctor ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{t('dr_label')}</Text>
+                <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>
+                  {(() => {
+                    const raw = safeApp.doctor || '';
+                    // Remove degree prefix to get only the name
+                    const nameOnly = raw.replace(/^(?:ThS\.|BS\.|TS\.|GS\.|PGS\.)\s*(?:CKI{1,2}\s*|CKII\s*|BSCK[12]\s*)?/i, '').trim();
+                    return nameOnly || raw || '—';
+                  })()}
+                </Text>
+              </View>
+              <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
+            </>
+          ) : null}
 
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{t('exam_date')}</Text>
-            <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>{safeApp.dateString}</Text>
+            <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>
+              {safeApp.displayDate || (safeApp.dateString && safeApp.dateString.includes('-')
+                ? safeApp.dateString.split('-').reverse().join('/')
+                : safeApp.dateString)}
+            </Text>
           </View>
           <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
 
@@ -86,34 +170,38 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
           </View>
           <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
 
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{t('clinic_room')}</Text>
-            <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>{t('room_102')}</Text>
-          </View>
-          <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
+          {!isPkg && safeApp.clinicRoom ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{t('clinic_room')}</Text>
+                <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>{safeApp.clinicRoom || t('room_102') || 'Phòng 102'}</Text>
+              </View>
+              <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
+            </>
+          ) : null}
 
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{t('expected_fee')}</Text>
-            <Text style={[styles.infoValueHighlight, isDarkMode && { color: '#F87171' }]}>150.000 VNĐ</Text>
+            <Text style={[styles.infoValueHighlight, isDarkMode && { color: '#F87171' }]}>{safeApp.fee || '250.000đ'}</Text>
           </View>
         </View>
 
         {/* Patient Info */}
-        <Text style={[styles.sectionTitle, isDarkMode && { color: '#9CA3AF' }]}>{t('patient_info') || 'Thông tin bệnh nhân'}</Text>
-        <View style={[styles.card, SHADOWS.card]}>
+        <Text style={[styles.sectionTitle, isDarkMode && { color: '#9CA3AF' }]}>Thông tin bệnh nhân</Text>
+        <View style={[styles.card, SHADOWS.card, isDarkMode && { backgroundColor: '#374151' }]}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Họ và tên</Text>
-            <Text style={styles.infoValueBold}>Nguyễn Văn Bệnh Nhân</Text>
+            <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>Họ và tên</Text>
+            <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>{currentUser?.fullName || 'Đặng Nguyễn'}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Số điện thoại</Text>
-            <Text style={styles.infoValue}>0909123456</Text>
+            <Text style={styles.infoValue}>{currentUser?.phone || '0909123456'}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Mã hồ sơ (BHYT)</Text>
-            <Text style={styles.infoValue}>SV123456789</Text>
+            <Text style={styles.infoValue}>BHYT-DTT-00000{currentUser?.patientId || 2}</Text>
           </View>
         </View>
 
@@ -176,11 +264,16 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
           </>
         ) : (
           <View style={styles.actionContainer}>
-            <TouchableOpacity style={[styles.actionBtn, styles.cancelBtn]} activeOpacity={0.8}>
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.cancelBtn, cancelling && { opacity: 0.5 }]} 
+              activeOpacity={0.8}
+              onPress={handleCancel}
+              disabled={cancelling}
+            >
               <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
-              <Text style={styles.cancelBtnText}>Hủy lịch</Text>
+              <Text style={styles.cancelBtnText}>{cancelling ? 'Đang xử lý...' : 'Hủy lịch'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, styles.navBtn]} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.actionBtn, styles.navBtn]} activeOpacity={0.8} onPress={handleDirections}>
               <Ionicons name="map-outline" size={20} color="#fff" />
               <Text style={styles.navBtnText}>Chỉ đường</Text>
             </TouchableOpacity>

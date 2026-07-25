@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Modal, FlatList } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Modal, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
@@ -144,49 +144,80 @@ const BookingScreen = ({ route, navigation }: any) => {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const [apiDoctors, setApiDoctors] = useState<any[]>([]);
+  const [doctorSchedules, setDoctorSchedules] = useState<any[]>([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
+
+  // Map specialty name → specialtyId (matches backend DB)
+  const getSpecialtyId = (specialty: string): number | undefined => {
+    if (specialty.includes('Nội') || specialty.includes('General')) return 1;
+    if (specialty.includes('Nhi') || specialty.includes('Pediatric')) return 2;
+    if (specialty.includes('Phụ') || specialty.includes('Sản') || specialty.includes('Obstetric')) return 3;
+    if (specialty.includes('Xương') || specialty.includes('Khớp') || specialty.includes('Musculoskeletal')) return 4;
+    if (specialty.includes('Tim') || specialty.includes('Cardi')) return 5;
+    if (specialty.includes('Thần') || specialty.includes('Neurology')) return 6;
+    if (specialty.includes('Da') || specialty.includes('Dermatology')) return 7;
+    if (specialty.includes('Hình') || specialty.includes('Imaging')) return 8;
+    return undefined;
+  };
 
   useEffect(() => {
-    fetchApiDoctors();
-  }, [selectedSpecialty]);
+    // Clear stale schedules immediately when specialty/date changes to avoid showing wrong doctors
+    setDoctorSchedules([]);
+    const specId = getSpecialtyId(selectedSpecialty);
+    // Only fetch if a specific specialty is selected
+    if (specId !== undefined) {
+      fetchApiSchedules(specId);
+    }
+  }, [selectedSpecialty, selectedDate]);
 
-  const fetchApiDoctors = async () => {
+  const fetchApiSchedules = async (specId: number) => {
     try {
-      const doctors = await apiMedical.getDoctors();
-      if (doctors && doctors.length > 0) {
-        setApiDoctors(doctors);
+      setSchedulesLoading(true);
+      const dateStr = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
+
+      // Use AbortController with 8-second timeout to avoid hanging
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      const schedules = await apiMedical.getDoctorSchedules(undefined, specId, dateStr);
+      clearTimeout(timeout);
+
+      if (schedules && schedules.length > 0) {
+        // Extra filter: ensure only doctors for this specialty are shown
+        const filtered = schedules.filter((s: any) =>
+          !s.specialtyId || s.specialtyId === specId
+        );
+        setDoctorSchedules(filtered.length > 0 ? filtered : schedules);
+      } else {
+        setDoctorSchedules([]);
       }
     } catch (e) {
-      console.log('Error fetching doctors in BookingScreen:', e);
+      console.log('Error fetching doctor schedules in BookingScreen:', e);
+      setDoctorSchedules([]);
+    } finally {
+      setSchedulesLoading(false);
     }
   };
 
   const currentDoctors = useMemo(() => {
     const dateStr = `${selectedDate.getDate()}/${selectedDate.getMonth() + 1}/${selectedDate.getFullYear()}`;
-    if (apiDoctors && apiDoctors.length > 0) {
-      return apiDoctors.map((doc: any) => ({
+    if (doctorSchedules && doctorSchedules.length > 0) {
+      return doctorSchedules.map((doc: any) => ({
         id: doc.doctorId,
-        title: doc.degree || 'BS. CK1',
+        title: doc.degree || 'BS.',
         name: doc.fullName ? doc.fullName.toUpperCase() : 'BÁC SĨ DTT',
-        slots: `3 ${t('time_slots')}`,
+        isWorking: doc.isWorking,
+        statusText: doc.statusText,
+        slots: doc.isWorking ? `${doc.timeSlots.length} ${t('time_slots')}` : 'NGHỈ PHÉP',
         date: dateStr,
         image: 'https://img.freepik.com/free-photo/smiling-asian-male-doctor-with-stethoscope-standing-crossed-arms-looking-camera-confident-medical-professional-clinic-hospital-background_1258-109033.jpg',
-        timeSlots: ['7:30 - 8:30', '8:30 - 9:30', '13:30 - 14:30']
+        timeSlots: doc.isWorking ? doc.timeSlots : []
       }));
     }
 
-    if (selectedSpecialty === t('pediatrics') || selectedSpecialty === 'Nhi khoa') {
-      return [
-        { id: 1, title: 'BS. CKII', name: 'LÊ THỊ BÉ', slots: `2 ${t('time_slots')}`, date: dateStr, timeSlots: ['7:30 - 8:30', '13:30 - 14:30'] },
-        { id: 2, title: 'ThS. BS', name: 'PHẠM VĂN D', slots: `3 ${t('time_slots')}`, date: dateStr, timeSlots: ['8:30 - 9:30', '10:30 - 11:30', '14:30 - 15:30'] }
-      ];
-    } else {
-      return [
-        { id: 1, title: 'BS. CKI', name: 'NGUYỄN VĂN A', slots: `3 ${t('time_slots')}`, date: dateStr, timeSlots: ['7:30 - 8:30', '8:30 - 9:30', '13:30 - 14:30'] },
-        { id: 2, title: 'BS. CKII', name: 'NGUYỄN VĂN B', slots: `5 ${t('time_slots')}`, date: dateStr, timeSlots: ['7:30 - 8:30', '8:30 - 9:30', '9:30 - 10:30', '13:30 - 14:30', '15:30 - 16:30'] },
-      ];
-    }
-  }, [selectedSpecialty, selectedDate, apiDoctors, t]);
+    // Return empty when loading or no specialty selected to avoid showing all doctors
+    return [];
+  }, [selectedSpecialty, selectedDate, doctorSchedules, t]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -292,7 +323,29 @@ const BookingScreen = ({ route, navigation }: any) => {
 
         {/* Doctor List */}
         <View style={styles.doctorList}>
-          {currentDoctors.map((doc) => {
+          {schedulesLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={{ marginTop: 12, color: COLORS.placeholder, fontSize: 14 }}>
+                Đang tải danh sách bác sĩ...
+              </Text>
+            </View>
+          ) : currentDoctors.length === 0 && getSpecialtyId(selectedSpecialty) === undefined ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Ionicons name="medkit-outline" size={48} color="#D0D0D0" />
+              <Text style={{ marginTop: 12, color: COLORS.placeholder, textAlign: 'center', fontSize: 14 }}>
+                Vui lòng chọn chuyên khoa{'\n'}để xem danh sách bác sĩ
+              </Text>
+            </View>
+          ) : currentDoctors.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Ionicons name="calendar-outline" size={48} color="#D0D0D0" />
+              <Text style={{ marginTop: 12, color: COLORS.placeholder, textAlign: 'center', fontSize: 14 }}>
+                Không có bác sĩ làm việc{'\n'}trong ngày này
+              </Text>
+            </View>
+          ) : (
+          <>{currentDoctors.map((doc) => {
             const isExpanded = expandedId === doc.id;
             return (
               <View key={doc.id} style={[styles.doctorCard, SHADOWS.card]}>
@@ -309,8 +362,8 @@ const BookingScreen = ({ route, navigation }: any) => {
                   <View style={styles.doctorInfo}>
                     <Text style={styles.doctorTitle}>{doc.title}</Text>
                     <Text style={styles.doctorName}>{doc.name}</Text>
-                    <View style={styles.slotBadge}>
-                      <Text style={styles.slotBadgeText}>{doc.slots}</Text>
+                    <View style={[styles.slotBadge, doc.isWorking === false && { backgroundColor: '#F1F5F9' }]}>
+                      <Text style={[styles.slotBadgeText, doc.isWorking === false && { color: '#64748B' }]}>{doc.isWorking === false ? 'NGHỈ PHÉP (OFF)' : doc.slots}</Text>
                     </View>
                     <Text style={styles.doctorDate}>{doc.date}</Text>
                   </View>
@@ -325,37 +378,50 @@ const BookingScreen = ({ route, navigation }: any) => {
                 </TouchableOpacity>
 
                 {/* Expanded Time Slots */}
-                {isExpanded && doc.timeSlots && (
+                {isExpanded && (
                   <View style={styles.expandedSection}>
-                    <View style={styles.expandedHeader}>
-                      <Ionicons name="time-outline" size={16} color={COLORS.text} />
-                      <Text style={styles.expandedHeaderText}>Chọn khung giờ khám</Text>
-                    </View>
-                    <View style={styles.slotsGrid}>
-                      {doc.timeSlots.map((time, idx) => (
-                        <TouchableOpacity 
-                          key={idx} 
-                          style={[styles.timeSlotBtn, SHADOWS.input]}
-                          onPress={() => {
-                            navigation.navigate('ConfirmBooking', {
-                              type: 'doctor',
-                              doctorName: `${doc.title} ${doc.name}`,
-                              specialty: selectedSpecialty,
-                              date: doc.date,
-                              time: time,
-                              price: '150.000đ'
-                            });
-                          }}
-                        >
-                          <Text style={styles.timeSlotText}>{time}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
+                    {doc.isWorking === false ? (
+                      <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                        <Ionicons name="calendar-outline" size={24} color="#94A3B8" />
+                        <Text style={{ marginTop: 6, fontSize: 13, color: '#64748B', textAlign: 'center' }}>
+                          Bác sĩ {doc.name} nghỉ khám ngày này. Vui lòng chọn ngày khác.
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.expandedHeader}>
+                          <Ionicons name="time-outline" size={16} color={COLORS.text} />
+                          <Text style={styles.expandedHeaderText}>Chọn khung giờ khám</Text>
+                        </View>
+                        <View style={styles.slotsGrid}>
+                          {doc.timeSlots && doc.timeSlots.map((time: string, idx: number) => (
+                            <TouchableOpacity 
+                              key={idx} 
+                              style={[styles.timeSlotBtn, SHADOWS.input]}
+                              onPress={() => {
+                                navigation.navigate('ConfirmBooking', {
+                                  type: 'doctor',
+                                  doctorId: doc.id,
+                                  doctorName: `${doc.title} ${doc.name}`,
+                                  specialty: selectedSpecialty,
+                                  date: doc.date,
+                                  time: time,
+                                  price: '250.000đ'
+                                });
+                              }}
+                            >
+                              <Text style={styles.timeSlotText}>{time}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </>
+                    )}
                   </View>
                 )}
               </View>
             );
-          })}
+          })}</>
+          )}
         </View>
 
         <View style={{ height: 120 }} />

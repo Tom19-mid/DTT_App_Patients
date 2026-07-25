@@ -25,15 +25,24 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
       setLoading(true);
       const data = await apiMedical.getDoctors(specialty?.id);
       if (data && data.length > 0) {
-        const formatted = data.map((d: any) => ({
-          id: d.doctorId,
-          name: d.fullName || 'Bác sĩ DTT',
-          title: d.degree || 'ThS. Bác sĩ',
-          rating: d.rating || 5.0,
-          reviews: d.reviewCount || 10,
-          bio: `Bác sĩ ${d.fullName || ''} có ${d.experienceYears || 10} năm kinh nghiệm công tác tại phòng khám ${d.clinicRoom || ''}. Chuyên sâu khám và tư vấn điều trị các bệnh lý ${specialty.name || 'chuyên khoa'}.`,
-          schedule: MOCK_SCHEDULE,
-        }));
+        const formatted = data.map((d: any) => {
+          const isShiftA = d.doctorId % 2 === 1;
+          const slotsToday = isShiftA ? ['07:30 - 08:30', '08:30 - 09:30', '09:30 - 10:30'] : ['13:30 - 14:30', '14:30 - 15:30', '15:30 - 16:30'];
+          const slotsTomorrow = isShiftA ? ['08:00 - 09:00', '10:30 - 11:30', '13:30 - 14:30'] : ['09:30 - 10:30', '14:30 - 15:30', '16:30 - 17:30'];
+
+          return {
+            id: d.doctorId,
+            name: d.fullName || 'Bác sĩ DTT',
+            title: d.degree || 'ThS. Bác sĩ',
+            rating: d.rating || 5.0,
+            reviews: d.reviewCount || 10,
+            bio: `Bác sĩ ${d.fullName || ''} có ${d.experienceYears || 10} năm kinh nghiệm công tác tại ${d.clinicRoom || 'Phòng khám'}.\n• Lịch trực thường niên: ${d.workingDaysText || 'Thứ Hai đến Thứ Bảy'}.\n• Chuyên sâu khám và tư vấn điều trị các bệnh lý ${specialty.name || 'chuyên khoa'}.`,
+            schedule: [
+              { dateLabel: 'Hôm nay, 25/07/2026', dateValue: '25/07/2026', slots: slotsToday },
+              { dateLabel: 'Ngày mai, 26/07/2026', dateValue: '26/07/2026', slots: slotsTomorrow }
+            ],
+          };
+        });
         setDoctors(formatted);
       } else {
         setDoctors([]);
@@ -127,14 +136,14 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
                     
                     <Text style={styles.bioTitle}>Lịch khám sắp tới:</Text>
                     
-                    {doc.schedule.map((day: any, sIdx: number) => (
+                    {Array.isArray(doc.schedule) && doc.schedule.map((day: any, sIdx: number) => (
                       <View key={sIdx} style={styles.scheduleDayBlock}>
                         <View style={styles.dateLabelRow}>
                           <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
                           <Text style={styles.dateLabelText}>{day.dateLabel}</Text>
                         </View>
                         <View style={styles.slotsGrid}>
-                          {day.slots.map((time: string, idx: number) => (
+                          {Array.isArray(day.slots) && day.slots.map((time: string, idx: number) => (
                             <TouchableOpacity 
                               key={idx} 
                               style={[styles.timeSlotBtn, SHADOWS.input]}

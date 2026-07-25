@@ -75,4 +75,120 @@ export const apiMedical = {
     request<Array<{ doctorId: number; fullName: string; degree: string; experienceYears: number; rating: number }>>(
       `/doctors${specialtyId ? `?specialtyId=${specialtyId}` : ''}`
     ),
+
+  getDoctorSchedules: (doctorId?: number, specialtyId?: number, dateStr?: string) =>
+    request<Array<{
+      doctorId: number;
+      specialtyId: number;
+      fullName: string;
+      degree: string;
+      clinicRoom: string;
+      date: string;
+      dayOfWeek: string;
+      isWorking: boolean;
+      statusText: string;
+      timeSlots: string[];
+    }>>(`/doctors/schedules?${doctorId ? `doctorId=${doctorId}&` : ''}${specialtyId ? `specialtyId=${specialtyId}&` : ''}${dateStr ? `dateStr=${dateStr}` : ''}`),
+};
+
+// ── Appointment APIs ──────────────────────────────────────────────────────────
+export const apiAppointment = {
+  createAppointment: (data: {
+    patientId?: number;
+    doctorId?: number;
+    doctorName: string;
+    specialtyName: string;
+    date: string;
+    timeSlot: string;
+    reason?: string;
+    fee?: string;
+  }) =>
+    request<{
+      appointmentId: number;
+      patientId: number;
+      doctorId: number;
+      doctorName: string;
+      specialtyName: string;
+      date: string;
+      timeSlot: string;
+      status: string;
+      queueNumber: number;
+      clinicRoom: string;
+      fee: string;
+      createdAt: string;
+    }>('/appointments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getPatientAppointments: (patientId: number) =>
+    request<Array<{
+      appointmentId: number;
+      patientId: number;
+      doctorId: number;
+      doctorName: string;
+      specialtyName: string;
+      date: string;
+      timeSlot: string;
+      status: string;
+      queueNumber: number;
+      clinicRoom: string;
+      fee: string;
+      createdAt: string;
+    }>>(`/appointments/patient/${patientId}`),
+
+  cancelAppointment: (id: number, cancelledBy?: string, cancelReason?: string) =>
+    request<{ success: boolean; message: string }>(`/appointments/${id}/cancel`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        cancelReason: cancelReason || 'Bệnh nhân hủy lịch qua ứng dụng',
+        cancelledBy: cancelledBy || 'patient',
+      }),
+    }),
+
+  getAllAppointments: () =>
+    request<Array<any>>('/appointments'),
+};
+
+// ── Health Package APIs ───────────────────────────────────────────────────────
+
+export interface HealthPackage {
+  packageId: number;
+  title: string;
+  description: string;
+  price: number;
+  priceFormatted: string;
+  genderTarget: 'male' | 'female' | 'all';
+  imageUrl?: string;
+  bookedCount: number;
+  bookedCountFormatted: string;
+  isActive: boolean;
+  details: string[];
+}
+
+export const apiHealthPackage = {
+  getAll: (gender?: 'male' | 'female') =>
+    request<HealthPackage[]>(`/healthpackages${gender ? `?gender=${gender}` : ''}`),
+
+  getById: (id: number) =>
+    request<HealthPackage>(`/healthpackages/${id}`),
+
+  bookPackage: (id: number, data: {
+    patientId: number;
+    patientName: string;
+    preferredDate?: string;
+    priceFormatted?: string;
+  }) =>
+    request<{
+      success: boolean;
+      message: string;
+      appointmentId: number;
+      packageTitle: string;
+      priceFormatted: string;
+      preferredDate: string;
+      queueNumber: number;
+    }>(`/healthpackages/${id}/book`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };

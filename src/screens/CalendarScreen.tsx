@@ -1,10 +1,13 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Modal, FlatList, Animated } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import DraggableChat from '../components/DraggableChat';
 import { useSettings } from '../context/SettingsContext';
+import { apiAppointment } from '../services/apiService';
+import { useAuth } from '../context/AuthContext';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const SPECIALTIES = [
@@ -19,40 +22,40 @@ const SPECIALTIES = [
 
 const MOCK_APPOINTMENTS = [
   {
-    id: 1,
+    id: 1001,
     dateString: '2026-07-26',
     specialtyKey: 'general_internal',
-    doctor: 'Bác sĩ Nguyễn Văn A',
+    doctor: 'BS. CKII Nguyễn Văn A',
     time: '9:30 - 10:30',
     statusKey: 'confirmed',
     statusColor: '#22C55E',
     isUpcoming: true,
   },
   {
-    id: 2,
+    id: 1002,
     dateString: '2026-07-21',
     specialtyKey: 'pediatrics',
-    doctor: 'Bác sĩ Lê Thị B',
+    doctor: 'BS. CKI Lê Thị B',
     time: '14:00 - 15:00',
     statusKey: 'completed',
     statusColor: '#3B82F6',
     isUpcoming: false,
   },
   {
-    id: 3,
+    id: 1003,
     dateString: '2026-05-15',
     specialtyKey: 'dermatology',
-    doctor: 'Bác sĩ Phạm Văn C',
+    doctor: 'BS. CKI Phạm Thị D',
     time: '08:30 - 09:30',
     statusKey: 'completed',
     statusColor: '#3B82F6',
     isUpcoming: false,
   },
   {
-    id: 4,
+    id: 1004,
     dateString: '2025-11-20',
     specialtyKey: 'obstetrics',
-    doctor: 'Bác sĩ Trần Thu Thủy',
+    doctor: 'TS. BS Đỗ Phương Hạnh',
     time: '10:00 - 11:00',
     statusKey: 'cancelled',
     statusColor: '#EF4444',
@@ -90,6 +93,133 @@ const CalendarScreen = ({ navigation }: any) => {
   const [selectedSpecialty, setSelectedSpecialty] = useState('choose_specialty');
   const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
   const { isDarkMode, t } = useSettings();
+  const { currentUser } = useAuth();
+  const [apiAppointments, setApiAppointments] = useState<any[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchAppointments();
+    }, [currentUser?.patientId])
+  );
+
+  const fetchAppointments = async () => {
+    try {
+      const targetPatientId = currentUser?.patientId || 2;
+      let data: any[] = [];
+      try {
+        const all = await apiAppointment.getAllAppointments();
+        if (all && Array.isArray(all)) {
+          // Display appointments for this specific user (or include patient 1 and 2 if logged in as default account 2)
+          data = all.filter(a => a.patientId === targetPatientId || (targetPatientId === 2 && a.patientId <= 2));
+        }
+      } catch (err) {
+        data = await apiAppointment.getPatientAppointments(targetPatientId);
+      }
+      if (!data || data.length === 0) {
+        data = await apiAppointment.getPatientAppointments(targetPatientId);
+      }
+      if (data && data.length > 0) {
+        setApiAppointments(data);
+      } else {
+        setApiAppointments([]);
+      }
+    } catch (e) {
+      console.log('Error fetching appointments in CalendarScreen:', e);
+    }
+  };
+
+  const combinedAppointments = useMemo(() => {
+    const formattedApi = apiAppointments.map(app => {
+      let specialty = app.specialtyName || app.specialtyKey;
+      let dateStr = app.date || app.createdAt || '26/07/2026';
+      let timeStr = app.timeSlot || '08:30 - 09:30';
+
+      // Parse specialty, date, and time directly from reason field to ensure full accuracy with SQL data
+      if (app.reason && typeof app.reason === 'string') {
+        if (app.reason.includes('-')) {
+          const specPart = app.reason.split('-')[0].trim();
+          if (specPart) specialty = specPart;
+        }
+        const dateMatch = app.reason.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/);
+        if (dateMatch && dateMatch[1]) dateStr = dateMatch[1];
+
+        const timeMatch = app.reason.match(/(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})/);
+        if (timeMatch && timeMatch[1]) timeStr = timeMatch[1];
+      }
+
+      // Fallback identification for specialty if still missing or generic
+      if (!specialty || specialty === 'Khám tổng quát') {
+        if (app.reason && app.reason.includes('Cơ xương khớp')) specialty = 'Cơ xương khớp';
+        else if (app.reason && app.reason.includes('Nội tổng quát')) specialty = 'Nội tổng quát';
+        else specialty = specialty || 'Khám chuyên khoa';
+      }
+
+      const isPkg = app.isPackage || app.specialtyName === 'Gói Khám Sức Khỏe' || app.doctorName === 'Gói Khám Sức Khỏe' || (app.reason && (app.reason.includes('Tầm soát') || app.reason.includes('Khám Tổng Quát') || app.reason.includes('Gói khám'))) || false;
+
+      // Clean doctor name - extract only the name part (remove degree prefix if it contains specialty info)
+      let doctor = app.doctorName || '';
+      if (isPkg || doctor === 'Gói Khám Sức Khỏe') {
+        doctor = '';
+      } else {
+        const bsMatch = doctor.match(/(?:ThS\.|BS\.|TS\.|GS\.|PGS\.).*/);
+        if (bsMatch) {
+          doctor = bsMatch[0].trim();
+        }
+        const nameOnly = doctor.replace(/^(?:ThS\.|BS\.|TS\.|GS\.|PGS\.)\s*(?:CKI{1,2}\s*|CKII\s*|BSCK[12]\s*)?/i, '').trim();
+        doctor = nameOnly || doctor || 'Phạm Tuấn Kiệt';
+      }
+
+      // Format dateString to YYYY-MM-DD for calendar compatibility
+      let formattedDateString = '2026-07-26';
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          formattedDateString = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      } else if (typeof dateStr === 'string' && dateStr.includes('-')) {
+        formattedDateString = dateStr.substring(0, 10);
+      }
+
+      // Handle status and tabs (raw entity has statusId 1=Confirmed, 2=Completed, 3=Cancelled)
+      let statusKey = 'confirmed';
+      let statusColor = '#22C55E';
+      let isUpcoming = true;
+
+      if (app.statusId === 3 || app.status === 'Cancelled' || app.status === 'cancelled') {
+        statusKey = 'cancelled';
+        statusColor = '#EF4444';
+        isUpcoming = false;
+      } else if (app.statusId === 2 || app.status === 'Completed' || app.status === 'completed') {
+        statusKey = 'completed';
+        statusColor = '#3B82F6';
+        isUpcoming = false;
+      }
+
+      // Format display date to DD/MM/YYYY for user-friendly display
+      let displayDate = formattedDateString;
+      if (formattedDateString && formattedDateString.includes('-')) {
+        const dp = formattedDateString.split('-');
+        if (dp.length === 3) displayDate = `${dp[2]}/${dp[1]}/${dp[0]}`;
+      }
+
+      return {
+        id: app.appointmentId || app.id || Math.random(),
+        dateString: formattedDateString,
+        displayDate: displayDate,
+        specialtyKey: specialty,
+        doctor: doctor,
+        time: timeStr,
+        statusKey: statusKey,
+        statusColor: statusColor,
+        clinicRoom: isPkg ? '' : (app.clinicRoom || (app.doctorId === 4 ? 'Phòng 205' : 'Phòng 102')),
+        fee: app.fee || '250.000đ',
+        isUpcoming: isUpcoming,
+        isPackage: isPkg,
+      };
+    });
+
+    return formattedApi;
+  }, [apiAppointments]);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -364,11 +494,9 @@ const CalendarScreen = ({ navigation }: any) => {
 
             {/* Filtered Appointments */}
             {(() => {
-              const formattedSelectedDate = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-
-              const filteredAppointments = MOCK_APPOINTMENTS.filter(app => {
+              const filteredAppointments = combinedAppointments.filter(app => {
                 if (activeTab === 'upcoming') {
-                  return app.isUpcoming && app.dateString === formattedSelectedDate;
+                  return app.isUpcoming;
                 }
                 return !app.isUpcoming;
               });
@@ -397,23 +525,29 @@ const CalendarScreen = ({ navigation }: any) => {
                   })}
                 >
                   <View style={styles.appointmentHeader}>
-                    <Text style={[styles.appointmentSpecialty, isDarkMode && { color: '#F3F4F6' }]}>{t(app.specialtyKey)}</Text>
+                    <Text style={[styles.appointmentSpecialty, isDarkMode && { color: '#F3F4F6' }]}>
+                      {t(app.specialtyKey) !== app.specialtyKey ? t(app.specialtyKey) : app.specialtyKey}
+                    </Text>
                     <View style={styles.statusBadge}>
                       <View style={[styles.statusDot, { backgroundColor: app.statusColor }]} />
-                      <Text style={[styles.statusText, { color: app.statusColor }]}>{t(app.statusKey)}</Text>
+                      <Text style={[styles.statusText, { color: app.statusColor }]}>
+                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'completed' ? 'Hoàn thành' : 'Đã hủy')}
+                      </Text>
                     </View>
                   </View>
 
                   <View style={styles.appointmentDetails}>
                     <View style={{ flex: 1, gap: 6 }}>
+                      {app.doctor ? (
+                        <View style={styles.detailRow}>
+                          <FontAwesome5 name="user-md" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
+                          <Text style={[styles.detailText, isDarkMode && { color: '#9CA3AF' }]}>{app.doctor}</Text>
+                        </View>
+                      ) : null}
                       <View style={styles.detailRow}>
-                        <FontAwesome5 name="user-md" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
-                        <Text style={[styles.detailText, isDarkMode && { color: '#9CA3AF' }]}>{app.doctor.replace('Bác sĩ', t('dr'))}</Text>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <Ionicons name={activeTab === 'history' ? "calendar-outline" : "time-outline"} size={14} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
+                        <Ionicons name="calendar-outline" size={14} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
                         <Text style={[styles.detailText, isDarkMode && { color: '#9CA3AF' }]}>
-                          {activeTab === 'history' ? `${app.dateString} | ${app.time}` : app.time}
+                          {`${app.displayDate || app.dateString} | ${app.time}`}
                         </Text>
                       </View>
                     </View>

@@ -20,14 +20,14 @@ export interface PatientProfile {
 const MOCK_PROFILES: PatientProfile[] = [
   {
     id: '1',
-    name: 'NGUYỄN ABC',
-    patientId: '#000001',
+    name: 'ĐẶNG NGUYỄN',
+    patientId: '#000002',
     relationship: 'Bản thân',
     verificationStatus: 'verified',
     isVerified: true,
     dob: '28/06/2000',
     gender: 'Nam',
-    phone: '0900031245',
+    phone: '0909123456',
     cccd: '079099123456',
     bhyt: 'DN4797912345678'
   },
@@ -75,7 +75,22 @@ const INITIAL_RECENT_SERVICES: RecentServiceItem[] = [
   { id: '3', name: 'Gói Khám Nam', detail: 'DTT Healthcare', time: 'Đã lưu', icon: 'medkit', type: 'package' },
 ];
 
+export interface User {
+  token?: string;
+  userId?: string;
+  patientId: number;
+  fullName: string;
+  phone: string;
+  email?: string;
+  verificationStatus?: string;
+  avatarInitials?: string;
+}
+
 interface AuthContextType {
+  currentUser: User;
+  setCurrentUser: React.Dispatch<React.SetStateAction<User>>;
+  login: (userData: any) => void;
+  logout: () => void;
   isVerified: boolean;
   setIsVerified: (value: boolean) => void;
   profiles: PatientProfile[];
@@ -86,7 +101,20 @@ interface AuthContextType {
   addRecentService: (item: Omit<RecentServiceItem, 'id' | 'time'> & { time?: string }) => void;
 }
 
+const defaultUser: User = {
+  patientId: 2,
+  fullName: 'Đặng Nguyễn',
+  phone: '0909123456',
+  email: 'dang@dtthealthcare.com',
+  avatarInitials: 'ĐN',
+  verificationStatus: 'verified',
+};
+
 const AuthContext = createContext<AuthContextType>({
+  currentUser: defaultUser,
+  setCurrentUser: () => {},
+  login: () => {},
+  logout: () => {},
   isVerified: true,
   setIsVerified: () => {},
   profiles: [],
@@ -98,18 +126,62 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [currentUser, setCurrentUser] = useState<User>(defaultUser);
   const [isVerified, setIsVerified] = useState(true);
   const [profiles, setProfiles] = useState<PatientProfile[]>(MOCK_PROFILES);
   const [recentServices, setRecentServices] = useState<RecentServiceItem[]>(INITIAL_RECENT_SERVICES);
 
-  // Sync the 'Bản thân' profile's verification status with global state
+  const login = (userData: any) => {
+    const name = userData.fullName || 'Người Dùng';
+    const parts = name.trim().split(' ');
+    let initials = 'U';
+    if (parts.length >= 2) {
+      initials = `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+    } else if (name.length >= 1) {
+      initials = name.substring(0, 2).toUpperCase();
+    }
+    
+    const loggedUser: User = {
+      token: userData.token,
+      userId: userData.userId,
+      patientId: typeof userData.patientId === 'number' ? userData.patientId : 2,
+      fullName: name,
+      phone: userData.phone || '0909123456',
+      email: userData.email || 'user@dtthealthcare.com',
+      verificationStatus: userData.verificationStatus || 'verified',
+      avatarInitials: initials,
+    };
+
+    setCurrentUser(loggedUser);
+    setIsVerified(loggedUser.verificationStatus === 'verified');
+
+    // Automatically synchronize the primary profile ('Bản thân') with this logged in user
+    setProfiles(prev => prev.map(p => p.relationship === 'Bản thân' ? {
+      ...p,
+      name: loggedUser.fullName.toUpperCase(),
+      phone: loggedUser.phone,
+      patientId: `#${String(loggedUser.patientId).padStart(6, '0')}`,
+      verificationStatus: 'verified',
+      isVerified: true
+    } : p));
+  };
+
+  const logout = () => {
+    // Reset to initial state or handle logout
+    setCurrentUser(defaultUser);
+  };
+
+  // Sync the 'Bản thân' profile's verification status with global state and currentUser
   React.useEffect(() => {
     setProfiles(prev => prev.map(p => p.relationship === 'Bản thân' ? {
       ...p,
+      name: currentUser.fullName.toUpperCase(),
+      phone: currentUser.phone,
+      patientId: `#${String(currentUser.patientId).padStart(6, '0')}`,
       verificationStatus: isVerified ? 'verified' : 'pending',
       isVerified
     } : p));
-  }, [isVerified]);
+  }, [isVerified, currentUser]);
 
   const addProfile = (data: Omit<PatientProfile, 'id' | 'patientId' | 'verificationStatus' | 'isVerified'>) => {
     const newProfile: PatientProfile = {
@@ -159,6 +231,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider value={{
+      currentUser, setCurrentUser, login, logout,
       isVerified, setIsVerified, profiles, addProfile, updateProfile, deleteProfile,
       recentServices, addRecentService
     }}>

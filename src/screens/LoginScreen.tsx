@@ -14,6 +14,7 @@ import {
 } from '../services/biometricService';
 import { apiAuth } from '../services/apiService';
 import { useCustomAlert } from '../context/AlertContext';
+import { useAuth } from '../context/AuthContext';
 
 const FaceIdIcon = ({ size = 28, color = COLORS.text }: { size?: number, color?: string }) => {
   const t = size * 0.08;
@@ -38,6 +39,7 @@ const FaceIdIcon = ({ size = 28, color = COLORS.text }: { size?: number, color?:
 const LoginScreen = ({ navigation }: any) => {
   const { isDarkMode, t } = useSettings();
   const { showAlert } = useCustomAlert();
+  const { login } = useAuth();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -110,6 +112,7 @@ const LoginScreen = ({ navigation }: any) => {
     try {
       // Try connecting to ASP.NET Core Web API Backend
       const res = await apiAuth.login(trimmedPhone, trimmedPass);
+      login(res);
       await saveTokenForBiometric(res.token, trimmedPhone);
       setBiometricAvailable(true);
       navigation.replace('MainTabs');

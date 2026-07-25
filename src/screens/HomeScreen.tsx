@@ -59,7 +59,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<typeof specialties[0] | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const { isVerified, recentServices, addRecentService } = useAuth();
+  const { isVerified, recentServices, addRecentService, currentUser } = useAuth();
   const { showAlert } = useCustomAlert();
   const { language, setLanguage, isDarkMode, setIsDarkMode, t } = useSettings();
 
@@ -127,11 +127,11 @@ const HomeScreen = ({ navigation }: any) => {
             </TouchableOpacity>
             <View style={styles.userGreeting}>
               <View style={styles.smallAvatar}>
-                <Text style={styles.smallAvatarText}>TD</Text>
+                <Text style={styles.smallAvatarText}>{currentUser?.avatarInitials || 'TD'}</Text>
               </View>
               <View>
                 <Text style={[styles.greetingText, isDarkMode && { color: '#9CA3AF' }]}>{t('hello')}</Text>
-                <Text style={[styles.userNameText, isDarkMode && { color: '#F3F4F6' }]}>User (SĐT)</Text>
+                <Text style={[styles.userNameText, isDarkMode && { color: '#F3F4F6' }]}>{currentUser?.phone || 'SĐT'}</Text>
               </View>
             </View>
           </View>

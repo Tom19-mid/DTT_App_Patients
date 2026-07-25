@@ -1,94 +1,63 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Modal, Animated, TouchableWithoutFeedback, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Modal, Animated, TouchableWithoutFeedback, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
+import { apiHealthPackage, HealthPackage } from '../services/apiService';
+import { useAuth } from '../context/AuthContext';
+import { useCustomAlert } from '../context/AlertContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const MOCK_PACKAGES = [
-  { 
-    id: 1, 
-    title: 'Khám Tổng Quát Cơ Bản - Nam', 
-    price: '1.200.000đ', 
-    booked: '1.2k+', 
-    image: 'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?auto=format&fit=crop&w=300&q=80',
-    description: 'Gói khám được thiết kế chuyên biệt cho nam giới, giúp tầm soát và phát hiện sớm các bệnh lý phổ biến.',
-    details: [
-      'Khám nội tổng quát (Đo huyết áp, nhịp tim, BMI...)',
-      'Xét nghiệm máu cơ bản (Đường huyết, mỡ máu, chức năng gan thận)',
-      'Siêu âm ổ bụng tổng quát',
-      'Chụp X-quang tim phổi thẳng',
-      'Tư vấn kết quả với bác sĩ chuyên khoa'
-    ]
-  },
-  { 
-    id: 2, 
-    title: 'Khám Tổng Quát Cơ Bản - Nữ', 
-    price: '1.450.000đ', 
-    booked: '2k+', 
-    image: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=300&q=80',
-    description: 'Gói khám toàn diện dành cho nữ giới, bao gồm các chỉ số sức khỏe tổng quát và siêu âm tuyến vú/phụ khoa cơ bản.',
-    details: [
-      'Khám nội tổng quát và Phụ khoa cơ bản',
-      'Xét nghiệm máu và nước tiểu',
-      'Siêu âm ổ bụng, siêu âm tuyến vú',
-      'Tầm soát tế bào ung thư cổ tử cung (Pap smear)',
-      'Tư vấn kết quả và phác đồ theo dõi'
-    ]
-  },
-  { 
-    id: 3, 
-    title: 'Tầm soát Ung thư Vú & Cổ tử cung', 
-    price: '2.500.000đ', 
-    booked: '500+', 
-    image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=300&q=80',
-    description: 'Tầm soát chuyên sâu giúp phát hiện sớm các dấu hiệu của ung thư vú và ung thư cổ tử cung ở phụ nữ.',
-    details: [
-      'Khám phụ khoa chuyên sâu',
-      'Chụp nhũ ảnh (Mammography) 2 bên',
-      'Xét nghiệm HPV DNA và Pap Liquid',
-      'Siêu âm tử cung phần phụ',
-      'Tư vấn nguy cơ và cách phòng ngừa'
-    ]
-  },
-  { 
-    id: 4, 
-    title: 'Tầm soát Bệnh lý Tim mạch', 
-    price: '1.800.000đ', 
-    booked: '800+', 
-    image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
-    description: 'Gói tầm soát dành cho người có nguy cơ cao về tim mạch, huyết áp, giúp ngăn ngừa biến chứng nguy hiểm.',
-    details: [
-      'Đo điện tâm đồ (ECG) lúc nghỉ',
-      'Siêu âm tim màu (Echocardiography)',
-      'Xét nghiệm bộ mỡ máu (Cholesterol, Triglyceride, HDL, LDL)',
-      'Đo chức năng đông máu',
-      'Tư vấn chế độ dinh dưỡng và sinh hoạt'
-    ]
-  },
-];
+// Fallback images for packages without image_url in DB
+const FALLBACK_IMAGES: Record<number, string> = {
+  1: 'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?auto=format&fit=crop&w=300&q=80',
+  2: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=300&q=80',
+  3: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=300&q=80',
+  4: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
+};
 
 const PackagesScreen = ({ route, navigation }: any) => {
   const { isDarkMode, t } = useSettings();
+  const { currentUser } = useAuth();
+  const { showAlert } = useCustomAlert();
   const { selectedId } = route.params || {};
-  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [packages, setPackages] = useState<HealthPackage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [booking, setBooking] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<HealthPackage | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
+  // Load packages from API on mount
+  useEffect(() => {
+    fetchPackages();
+  }, []);
+
+  const fetchPackages = async () => {
+    try {
+      setLoading(true);
+      const data = await apiHealthPackage.getAll();
+      setPackages(data);
+    } catch (e) {
+      console.log('Error fetching health packages:', e);
+      // API unavailable — keep empty list (no mock fallback)
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Auto-open modal if a package was passed via navigation params
   useEffect(() => {
-    if (selectedId) {
-      const pkg = MOCK_PACKAGES.find(p => p.id === selectedId);
-      if (pkg) {
-        handleOpenDetail(pkg);
-      }
+    if (selectedId && packages.length > 0) {
+      const pkg = packages.find(p => p.packageId === selectedId);
+      if (pkg) handleOpenDetail(pkg);
     }
-  }, [selectedId]);
+  }, [selectedId, packages]);
 
-  const handleOpenDetail = (pkg: any) => {
+  const handleOpenDetail = (pkg: HealthPackage) => {
     setSelectedPackage(pkg);
     setModalVisible(true);
     Animated.parallel([
@@ -105,6 +74,36 @@ const PackagesScreen = ({ route, navigation }: any) => {
       setModalVisible(false);
       setSelectedPackage(null);
     });
+  };
+
+  const handleBookPackage = async () => {
+    if (!selectedPackage) return;
+    try {
+      setBooking(true);
+      const result = await apiHealthPackage.bookPackage(selectedPackage.packageId, {
+        patientId: currentUser?.patientId || 2,
+        patientName: currentUser?.fullName || 'Bệnh nhân',
+        priceFormatted: selectedPackage.priceFormatted,
+      });
+      handleCloseDetail();
+      showAlert({
+        title: '✅ Đặt gói khám thành công!',
+        message: `Gói **${result.packageTitle}** đã được đặt thành công.\n\n📅 Ngày dự kiến: ${result.preferredDate}\n💰 Chi phí: ${result.priceFormatted}\n🔢 Số thứ tự: ${result.queueNumber}`,
+        type: 'success',
+        confirmText: 'Xem lịch khám',
+        cancelText: 'Đóng',
+        onConfirm: () => navigation.navigate('Calendar'),
+      });
+    } catch (e) {
+      showAlert({
+        title: '⚠️ Thông báo',
+        message: 'Không thể kết nối server để đặt gói khám. Vui lòng thử lại sau.',
+        type: 'error',
+        confirmText: 'Đã hiểu',
+      });
+    } finally {
+      setBooking(false);
+    }
   };
 
   return (
@@ -136,30 +135,45 @@ const PackagesScreen = ({ route, navigation }: any) => {
 
         <Text style={[styles.pageSubtitle, isDarkMode && { color: '#9CA3AF' }]}>{t('package_desc_title')}</Text>
         
-        {MOCK_PACKAGES.map((pkg) => (
-          <TouchableOpacity 
-            key={pkg.id} 
-            style={[styles.packageCard, SHADOWS.card, isDarkMode && { backgroundColor: '#1F2937' }]} 
-            activeOpacity={0.9} 
-            onPress={() => handleOpenDetail(pkg)}
-          >
-            <Image source={{ uri: pkg.image }} style={styles.packageImage} />
-            <View style={styles.packageBadge}>
-              <Ionicons name="flame" size={12} color="#EF4444" />
-              <Text style={styles.packageBadgeText}>{pkg.booked.replace('đã đặt', '').trim()} {t('booked')}</Text>
-            </View>
-            <View style={styles.packageInfo}>
-              <Text style={[styles.packageTitle, isDarkMode && { color: '#F3F4F6' }]}>{pkg.title}</Text>
-              <Text style={[styles.packageDescription, isDarkMode && { color: '#9CA3AF' }]} numberOfLines={2}>{pkg.description}</Text>
-              <View style={styles.packageFooter}>
-                <Text style={styles.packagePrice}>{pkg.price}</Text>
-                <TouchableOpacity style={styles.bookBtnSmall} onPress={() => handleOpenDetail(pkg)}>
-                  <Text style={styles.bookBtnSmallText}>{t('details')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+        {loading ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={{ marginTop: 12, color: COLORS.placeholder, fontSize: 14 }}>Đang tải danh sách gói khám...</Text>
+          </View>
+        ) : packages.length === 0 ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <Ionicons name="medkit-outline" size={48} color="#D0D0D0" />
+            <Text style={{ marginTop: 12, color: COLORS.placeholder, fontSize: 14 }}>Chưa có gói khám nào khả dụng</Text>
+          </View>
+        ) : (
+          packages.map((pkg) => {
+            const displayImg = pkg.imageUrl || FALLBACK_IMAGES[pkg.packageId] || FALLBACK_IMAGES[1];
+            return (
+              <TouchableOpacity 
+                key={pkg.packageId} 
+                style={[styles.packageCard, SHADOWS.card, isDarkMode && { backgroundColor: '#1F2937' }]} 
+                activeOpacity={0.9} 
+                onPress={() => handleOpenDetail(pkg)}
+              >
+                <Image source={{ uri: displayImg }} style={styles.packageImage} />
+                <View style={styles.packageBadge}>
+                  <Ionicons name="flame" size={12} color="#EF4444" />
+                  <Text style={styles.packageBadgeText}>{pkg.bookedCountFormatted} {t('booked')}</Text>
+                </View>
+                <View style={styles.packageInfo}>
+                  <Text style={[styles.packageTitle, isDarkMode && { color: '#F3F4F6' }]}>{pkg.title}</Text>
+                  <Text style={[styles.packageDescription, isDarkMode && { color: '#9CA3AF' }]} numberOfLines={2}>{pkg.description}</Text>
+                  <View style={styles.packageFooter}>
+                    <Text style={styles.packagePrice}>{pkg.priceFormatted}</Text>
+                    <TouchableOpacity style={styles.bookBtnSmall} onPress={() => handleOpenDetail(pkg)}>
+                      <Text style={styles.bookBtnSmallText}>{t('details')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -188,15 +202,15 @@ const PackagesScreen = ({ route, navigation }: any) => {
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-                <Image source={{ uri: selectedPackage.image }} style={styles.detailImage} />
+                <Image source={{ uri: selectedPackage.imageUrl || FALLBACK_IMAGES[selectedPackage.packageId] || FALLBACK_IMAGES[1] }} style={styles.detailImage} />
                 <View style={styles.detailBody}>
                   <Text style={[styles.detailTitle, isDarkMode && { color: '#F3F4F6' }]}>{selectedPackage.title}</Text>
-                  <Text style={styles.detailPrice}>{selectedPackage.price}</Text>
+                  <Text style={styles.detailPrice}>{selectedPackage.priceFormatted}</Text>
                   
                   <View style={styles.infoBadgeRow}>
                     <View style={styles.infoBadge}>
                       <Ionicons name="people" size={14} color={COLORS.primary} />
-                      <Text style={styles.infoBadgeText}>{selectedPackage.booked.replace('đã đặt', '').trim()} {t('booked')}</Text>
+                      <Text style={styles.infoBadgeText}>{selectedPackage.bookedCountFormatted} {t('booked')}</Text>
                     </View>
                     <View style={styles.infoBadge}>
                       <Ionicons name="time" size={14} color={COLORS.primary} />
@@ -209,7 +223,7 @@ const PackagesScreen = ({ route, navigation }: any) => {
 
                   <Text style={[styles.sectionHeader, isDarkMode && { color: '#F3F4F6' }]}>{t('service_includes')}</Text>
                   <View style={styles.serviceList}>
-                    {selectedPackage.details.map((item: string, index: number) => (
+                    {selectedPackage.details && selectedPackage.details.map((item: string, index: number) => (
                       <View key={index} style={styles.serviceItem}>
                         <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
                         <Text style={[styles.serviceItemText, isDarkMode && { color: '#D1D5DB' }]}>{item}</Text>
@@ -222,15 +236,16 @@ const PackagesScreen = ({ route, navigation }: any) => {
               <View style={[styles.bottomAction, SHADOWS.card, isDarkMode && { backgroundColor: '#1F2937', borderTopColor: '#374151' }]}>
                 <View>
                   <Text style={styles.totalLabel}>{t('total_cost')}</Text>
-                  <Text style={styles.totalPrice}>{selectedPackage.price}</Text>
+                  <Text style={styles.totalPrice}>{selectedPackage.priceFormatted}</Text>
                 </View>
                 <TouchableOpacity style={styles.mainBookBtn} onPress={() => {
                   handleCloseDetail();
                   setTimeout(() => {
                     navigation.navigate('ConfirmBooking', { 
                       type: 'package',
+                      packageId: selectedPackage.packageId,
                       packageName: selectedPackage.title,
-                      price: selectedPackage.price
+                      price: selectedPackage.priceFormatted
                     });
                   }, 300);
                 }}>
