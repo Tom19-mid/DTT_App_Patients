@@ -89,16 +89,48 @@ const ProfileDetailScreen = ({ route, navigation }: any) => {
         <ScrollView contentContainerStyle={styles.container}>
           
           {!isNew && existingProfile && (
-            <View style={styles.statusBox}>
-              <Ionicons 
-                name={existingProfile.isVerified ? "checkmark-circle" : "time"} 
-                size={20} 
-                color={existingProfile.isVerified ? "#10B981" : "#F59E0B"} 
-              />
-              <Text style={[styles.statusText, { color: existingProfile.isVerified ? "#10B981" : "#F59E0B" }]}>
-                {existingProfile.isVerified ? 'Hồ sơ đã được bệnh viện xác thực' : 'Hồ sơ chưa được xác thực'}
-              </Text>
-            </View>
+            (() => {
+              const status = existingProfile.verificationStatus || (existingProfile.isVerified ? 'verified' : 'pending');
+
+              if (status === 'verified') {
+                return (
+                  <View style={[styles.statusBox, { backgroundColor: '#ECFDF5' }]}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={[styles.statusText, { color: '#10B981' }]}>
+                      Hồ sơ đã được bệnh viện xác thực
+                    </Text>
+                  </View>
+                );
+              }
+
+              if (status === 'rejected') {
+                return (
+                  <View style={[styles.statusBox, { backgroundColor: '#FEF2F2', flexDirection: 'column', alignItems: 'flex-start' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <Ionicons name="close-circle" size={20} color="#EF4444" />
+                      <Text style={[styles.statusText, { color: '#EF4444' }]}>
+                        Hồ sơ bị từ chối xác thực
+                      </Text>
+                    </View>
+                    {existingProfile.verificationNote ? (
+                      <Text style={{ fontSize: 13, color: '#991B1B', lineHeight: 18, marginLeft: 28 }}>
+                        Lý do: {existingProfile.verificationNote}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              }
+
+              // Pending
+              return (
+                <View style={[styles.statusBox, { backgroundColor: '#FFFBEB' }]}>
+                  <Ionicons name="time" size={20} color="#F59E0B" />
+                  <Text style={[styles.statusText, { color: '#B45309', flex: 1 }]}>
+                    Hồ sơ đang chờ xác thực — Vui lòng mang CCCD đến quầy lễ tân để đối chiếu
+                  </Text>
+                </View>
+              );
+            })()
           )}
 
           <View style={[styles.formCard, SHADOWS.card]}>

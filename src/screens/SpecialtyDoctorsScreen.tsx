@@ -1,39 +1,70 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { apiMedical } from '../services/apiService';
 
-const DOCTORS = [
-  {
-    id: 1,
-    name: 'Nguyễn Văn A',
-    title: 'BS. CKII',
-    rating: 4.9,
-    reviews: 120,
-    bio: 'Bác sĩ Nguyễn Văn A có hơn 15 năm kinh nghiệm trong lĩnh vực Nội Tổng quát. Từng công tác tại bệnh viện Chợ Rẫy và tu nghiệp tại Pháp. Bác sĩ chuyên điều trị các bệnh lý về tiêu hóa, hô hấp và tim mạch cơ bản.',
-    schedule: [
-      { dateLabel: 'Hôm nay, 21/07/2026', dateValue: '21/07/2026', slots: ['7:30 - 8:30', '8:30 - 9:30', '13:30 - 14:30'] },
-      { dateLabel: 'Ngày mai, 22/07/2026', dateValue: '22/07/2026', slots: ['8:30 - 9:30', '9:30 - 10:30'] }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Trần Thị B',
-    title: 'ThS. BS',
-    rating: 4.8,
-    reviews: 85,
-    bio: 'Thạc sĩ Bác sĩ Trần Thị B chuyên sâu về Nội tiết và Đái tháo đường. Có nhiều năm kinh nghiệm trong việc tư vấn dinh dưỡng và điều trị các bệnh lý mãn tính. Từng tham gia nhiều hội thảo y khoa quốc tế.',
-    schedule: [
-      { dateLabel: 'Hôm nay, 21/07/2026', dateValue: '21/07/2026', slots: ['8:00 - 9:00', '15:00 - 16:00'] },
-      { dateLabel: 'Ngày mốt, 23/07/2026', dateValue: '23/07/2026', slots: ['10:00 - 11:00', '13:00 - 14:00'] }
-    ]
-  }
+const MOCK_SCHEDULE = [
+  { dateLabel: 'Hôm nay, 25/07/2026', dateValue: '25/07/2026', slots: ['7:30 - 8:30', '8:30 - 9:30', '13:30 - 14:30'] },
+  { dateLabel: 'Ngày mai, 26/07/2026', dateValue: '26/07/2026', slots: ['8:30 - 9:30', '9:30 - 10:30', '15:00 - 16:00'] }
 ];
 
 const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
-  const { specialty } = route.params || { specialty: { name: 'Chuyên khoa' } };
+  const { specialty } = route.params || { specialty: { name: 'Chuyên khoa', id: undefined } };
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchDoctors();
+  }, [specialty]);
+
+  const fetchDoctors = async () => {
+    try {
+      setLoading(true);
+      const data = await apiMedical.getDoctors(specialty?.id);
+      if (data && data.length > 0) {
+        const formatted = data.map((d: any) => ({
+          id: d.doctorId,
+          name: d.fullName || 'Bác sĩ DTT',
+          title: d.degree || 'ThS. Bác sĩ',
+          rating: d.rating || 5.0,
+          reviews: d.reviewCount || 10,
+          bio: `Bác sĩ ${d.fullName || ''} có ${d.experienceYears || 10} năm kinh nghiệm công tác tại phòng khám ${d.clinicRoom || ''}. Chuyên sâu khám và tư vấn điều trị các bệnh lý ${specialty.name || 'chuyên khoa'}.`,
+          schedule: MOCK_SCHEDULE,
+        }));
+        setDoctors(formatted);
+      } else {
+        setDoctors([]);
+      }
+    } catch (error) {
+      console.log('Error fetching doctors from API:', error);
+      // Fallback
+      setDoctors([
+        {
+          id: 1,
+          name: 'BS. CK1 Nguyễn Văn A',
+          title: 'Chuyên khoa I Nội tổng quát',
+          rating: 4.9,
+          reviews: 120,
+          bio: 'Bác sĩ Nguyễn Văn A có hơn 10 năm kinh nghiệm trong lĩnh vực Nội Tổng quát tại bệnh viện.',
+          schedule: MOCK_SCHEDULE
+        },
+        {
+          id: 2,
+          name: 'BS. CKI Lê Thị B',
+          title: 'Bác sĩ Chuyên khoa Nhi',
+          rating: 5.0,
+          reviews: 98,
+          bio: 'Bác sĩ Lê Thị B chuyên chăm sóc sức khỏe và điều trị bệnh lý nhi khoa.',
+          schedule: MOCK_SCHEDULE
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleExpand = (id: number) => {
     setExpandedId(expandedId === id ? null : id);
@@ -51,112 +82,223 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionDesc}>
-          Danh sách các bác sĩ chuyên khoa {specialty.name} đang công tác tại phòng khám. Bạn có thể xem thông tin chi tiết và đặt lịch khám ngay.
+          Danh sách các bác sĩ chuyên khoa {specialty.name} đang công tác tại hệ thống. Dữ liệu được cập nhật trực tiếp từ hệ thống quản lý.
         </Text>
 
-        {DOCTORS.map((doc) => {
-          const isExpanded = expandedId === doc.id;
-          return (
-            <View key={doc.id} style={[styles.doctorCard, SHADOWS.card]}>
-              <TouchableOpacity style={styles.doctorHeader} activeOpacity={0.7} onPress={() => toggleExpand(doc.id)}>
-                <View style={styles.avatarPlaceholder}>
-                  <FontAwesome5 name="user-md" size={32} color={COLORS.primary} />
-                </View>
-                <View style={styles.doctorInfo}>
-                  <Text style={styles.doctorTitle}>{doc.title}</Text>
-                  <Text style={styles.doctorName}>{doc.name}</Text>
-                  <View style={styles.ratingRow}>
-                    <Ionicons name="star" size={14} color="#FBBF24" />
-                    <Text style={styles.ratingText}>{doc.rating} ({doc.reviews} đánh giá)</Text>
+        {loading ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={{ marginTop: 12, color: COLORS.subtext }}>Đang tải danh sách Bác sĩ từ máy chủ...</Text>
+          </View>
+        ) : doctors.length === 0 ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <Ionicons name="people-outline" size={48} color={COLORS.placeholder} />
+            <Text style={{ marginTop: 12, color: COLORS.subtext }}>Chưa có bác sĩ thuộc chuyên khoa này.</Text>
+          </View>
+        ) : (
+          doctors.map((doc) => {
+            const isExpanded = expandedId === doc.id;
+            return (
+              <View key={doc.id} style={[styles.doctorCard, SHADOWS.card]}>
+                <TouchableOpacity style={styles.doctorHeader} activeOpacity={0.7} onPress={() => toggleExpand(doc.id)}>
+                  <View style={styles.avatarPlaceholder}>
+                    <FontAwesome5 name="user-md" size={32} color={COLORS.primary} />
                   </View>
-                </View>
-                <Ionicons 
-                  name={isExpanded ? "chevron-up" : "chevron-down"} 
-                  size={24} 
-                  color={COLORS.placeholder} 
-                />
-              </TouchableOpacity>
-
-              {isExpanded && (
-                <View style={styles.expandedContent}>
-                  <View style={styles.divider} />
-                  <Text style={styles.bioTitle}>Giới thiệu:</Text>
-                  <Text style={styles.bioText}>{doc.bio}</Text>
-                  
-                  <Text style={styles.bioTitle}>Lịch khám sắp tới:</Text>
-                  
-                  {doc.schedule.map((day, sIdx) => (
-                    <View key={sIdx} style={styles.scheduleDayBlock}>
-                      <View style={styles.dateLabelRow}>
-                        <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
-                        <Text style={styles.dateLabelText}>{day.dateLabel}</Text>
-                      </View>
-                      <View style={styles.slotsGrid}>
-                        {day.slots.map((time, idx) => (
-                          <TouchableOpacity 
-                            key={idx} 
-                            style={[styles.timeSlotBtn, SHADOWS.input]}
-                            onPress={() => {
-                              navigation.navigate('ConfirmBooking', {
-                                type: 'doctor',
-                                doctorName: `${doc.title} ${doc.name}`,
-                                specialty: specialty.name,
-                                date: day.dateValue,
-                                time: time,
-                                price: '150.000đ'
-                              });
-                            }}
-                          >
-                            <Text style={styles.timeSlotText}>{time}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
+                  <View style={styles.doctorInfo}>
+                    <Text style={styles.doctorTitle}>{doc.title}</Text>
+                    <Text style={styles.doctorName}>{doc.name}</Text>
+                    <View style={styles.ratingRow}>
+                      <Ionicons name="star" size={14} color="#FBBF24" />
+                      <Text style={styles.ratingText}>{doc.rating} ({doc.reviews} đánh giá)</Text>
                     </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          );
-        })}
+                  </View>
+                  <Ionicons 
+                    name={isExpanded ? "chevron-up" : "chevron-down"} 
+                    size={24} 
+                    color={COLORS.placeholder} 
+                  />
+                </TouchableOpacity>
+
+                {isExpanded && (
+                  <View style={styles.expandedContent}>
+                    <View style={styles.divider} />
+                    <Text style={styles.bioTitle}>Giới thiệu:</Text>
+                    <Text style={styles.bioText}>{doc.bio}</Text>
+                    
+                    <Text style={styles.bioTitle}>Lịch khám sắp tới:</Text>
+                    
+                    {doc.schedule.map((day: any, sIdx: number) => (
+                      <View key={sIdx} style={styles.scheduleDayBlock}>
+                        <View style={styles.dateLabelRow}>
+                          <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
+                          <Text style={styles.dateLabelText}>{day.dateLabel}</Text>
+                        </View>
+                        <View style={styles.slotsGrid}>
+                          {day.slots.map((time: string, idx: number) => (
+                            <TouchableOpacity 
+                              key={idx} 
+                              style={[styles.timeSlotBtn, SHADOWS.input]}
+                              onPress={() => {
+                                navigation.navigate('ConfirmBooking', {
+                                  doctorName: `${doc.title} ${doc.name}`,
+                                  specialtyName: specialty.name,
+                                  date: day.dateValue,
+                                  timeSlot: time,
+                                  location: 'Phòng khám đa khoa DTT Healthcare',
+                                  fee: '250.000đ'
+                                });
+                              }}
+                            >
+                              <Text style={styles.timeSlotText}>{time}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
-  
-  container: { padding: 16, paddingBottom: 40 },
-  sectionDesc: { fontSize: 14, color: COLORS.placeholder, marginBottom: 20, lineHeight: 22 },
-  
-  doctorCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16 },
-  doctorHeader: { flexDirection: 'row', alignItems: 'center' },
-  avatarPlaceholder: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#F0F5FF', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  doctorInfo: { flex: 1 },
-  doctorTitle: { fontSize: 13, color: COLORS.primary, fontWeight: 'bold', marginBottom: 2 },
-  doctorName: { fontSize: 16, fontWeight: 'bold', color: COLORS.text, marginBottom: 4 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ratingText: { fontSize: 12, color: COLORS.placeholder },
-  
-  expandedContent: { marginTop: 12 },
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginBottom: 16 },
-  bioTitle: { fontSize: 14, fontWeight: 'bold', color: COLORS.text, marginBottom: 6 },
-  bioText: { fontSize: 14, color: COLORS.placeholder, lineHeight: 22, marginBottom: 16, textAlign: 'justify' },
-  
-  scheduleDayBlock: { marginBottom: 16 },
-  dateLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 6 },
-  dateLabelText: { fontSize: 14, fontWeight: 'bold', color: COLORS.primary },
-  
-  slotsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  timeSlotBtn: { width: '30%', backgroundColor: '#fff', paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#F0F5FF' },
-  timeSlotText: { fontSize: 13, fontWeight: '600', color: COLORS.primary },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: COLORS.card,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justify: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  container: {
+    padding: 16,
+  },
+  sectionDesc: {
+    fontSize: 14,
+    color: COLORS.subtext,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  doctorCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  doctorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  doctorInfo: {
+    flex: 1,
+  },
+  doctorTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginBottom: 2,
+  },
+  doctorName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingText: {
+    fontSize: 12,
+    color: COLORS.subtext,
+    marginLeft: 4,
+  },
+  expandedContent: {
+    marginTop: 14,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+  bioTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  bioText: {
+    fontSize: 13,
+    color: COLORS.subtext,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  scheduleDayBlock: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  dateLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dateLabelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginLeft: 6,
+  },
+  slotsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeSlotBtn: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  timeSlotText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
 });
 
 export default SpecialtyDoctorsScreen;

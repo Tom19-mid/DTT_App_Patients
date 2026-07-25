@@ -46,6 +46,12 @@ const MOCK_PACKAGES = [
   { id: 4, titleKey: 'pkg_heart', price: '1.800.000đ', booked: '800+', image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80' },
 ];
 
+const RECENT_SERVICES = [
+  { id: 1, name: 'BS. Nguyễn Văn A', detail: 'Nội tổng quát', time: 'Khám gần nhất: 15/05', icon: 'stethoscope', type: 'doctor' },
+  { id: 2, name: 'Nhi khoa', detail: 'BS. Lê Thị B', time: 'Khám gần nhất: 21/07', icon: 'baby', type: 'specialty' },
+  { id: 3, name: 'Gói Khám Nam', detail: 'DTT Healthcare', time: 'Đã lưu', icon: 'medkit', type: 'package' },
+];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 const HomeScreen = ({ navigation }: any) => {
   const HAS_APPOINTMENTS = false; // Toggle this to true to see the upcoming appointment card
@@ -53,7 +59,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<typeof specialties[0] | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const { isVerified } = useAuth();
+  const { isVerified, recentServices, addRecentService } = useAuth();
   const { showAlert } = useCustomAlert();
   const { language, setLanguage, isDarkMode, setIsDarkMode, t } = useSettings();
 
@@ -81,9 +87,20 @@ const HomeScreen = ({ navigation }: any) => {
   };
 
   const openBottomSheet = useCallback((specialty: typeof specialties[0]) => {
+    const keys = ['general_internal', 'pediatrics', 'obstetrics', 'musculoskeletal', 'cardiology', 'neurology', 'dermatology', 'imaging'];
+    const specName = t(keys[specialty.id - 1]) || 'Chuyên khoa';
+
+    addRecentService({
+      name: specName,
+      detail: 'DTT Healthcare',
+      icon: specialty.icon,
+      type: 'specialty',
+      specialtyName: specName,
+    });
+
     setSelectedSpecialty(specialty);
     setSheetVisible(true);
-  }, []);
+  }, [addRecentService, t]);
 
   const closeBottomSheet = useCallback(() => {
     setSheetVisible(false);
@@ -215,6 +232,50 @@ const HomeScreen = ({ navigation }: any) => {
             );
           })}
         </View>
+
+        {/* ── Recent Services (Đã tương tác gần đây) ── */}
+        {recentServices.length > 0 && (
+          <View style={styles.recentSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, isDarkMode && { color: '#F3F4F6' }]}>Đã dùng gần đây</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Calendar')}>
+                <Text style={styles.seeAllText}>Lịch sử</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentScroll}>
+              {recentServices.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.recentCard,
+                    SHADOWS.card,
+                    isDarkMode && { backgroundColor: '#374151', borderColor: '#4B5563', elevation: 0, shadowOpacity: 0 }
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (item.type === 'doctor') {
+                      navigation.navigate('Booking', { doctorName: item.name, specialty: item.detail });
+                    } else if (item.type === 'package') {
+                      navigation.navigate('Packages');
+                    } else {
+                      navigation.navigate('Booking', { specialtyName: item.name });
+                    }
+                  }}
+                >
+                  <View style={[styles.recentIconBox, isDarkMode && { backgroundColor: 'rgba(99,102,241,0.2)' }]}>
+                    <FontAwesome5 name={item.icon || 'stethoscope'} size={18} color={isDarkMode ? '#818CF8' : COLORS.primary} />
+                  </View>
+                  <View style={{ flex: 1, marginRight: 6 }}>
+                    <Text style={[styles.recentName, isDarkMode && { color: '#F3F4F6' }]} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[styles.recentDetail, isDarkMode && { color: '#9CA3AF' }]} numberOfLines={1}>{item.detail}</Text>
+                    <Text style={styles.recentTime} numberOfLines={1}>{item.time}</Text>
+                  </View>
+                  <Ionicons name="repeat-outline" size={18} color={isDarkMode ? '#818CF8' : COLORS.primary} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ── Featured Packages (Replaces Banner) ── */}
         <View style={styles.packagesSection}>
@@ -421,6 +482,52 @@ const styles = StyleSheet.create({
     borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 10,
   },
   itemText: { fontSize: 12, textAlign: 'center', color: COLORS.text, fontWeight: '500' },
+
+  // Recent Services
+  recentSection: {
+    marginTop: 5,
+    marginBottom: 15,
+  },
+  recentScroll: {
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  recentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 14,
+    marginRight: 14,
+    width: 235,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  recentIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  recentName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  recentDetail: {
+    fontSize: 12,
+    color: COLORS.placeholder,
+    marginBottom: 3,
+  },
+  recentTime: {
+    fontSize: 11,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
 
   // Upcoming Appointment Styles
   sectionHeader: {

@@ -12,6 +12,8 @@ import {
   isBiometricEnabled,
   checkBiometricCapability,
 } from '../services/biometricService';
+import { apiAuth } from '../services/apiService';
+import { useCustomAlert } from '../context/AlertContext';
 
 const FaceIdIcon = ({ size = 28, color = COLORS.text }: { size?: number, color?: string }) => {
   const t = size * 0.08;
@@ -35,6 +37,7 @@ const FaceIdIcon = ({ size = 28, color = COLORS.text }: { size?: number, color?:
 
 const LoginScreen = ({ navigation }: any) => {
   const { isDarkMode, t } = useSettings();
+  const { showAlert } = useCustomAlert();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -54,12 +57,13 @@ const LoginScreen = ({ navigation }: any) => {
     const result = await loginWithBiometric();
 
     if (result.success) {
-      // TODO: validate result.token with backend API if needed
-      Alert.alert(
-        t('login_success') || 'Thành công',
-        'Đăng nhập bằng Face ID thành công!',
-        [{ text: 'OK', onPress: () => navigation.replace('MainTabs') }]
-      );
+      showAlert({
+        title: 'Thành công',
+        message: 'Đăng nhập bằng Face ID thành công!',
+        type: 'success',
+        confirmText: 'Vào ứng dụng',
+        onConfirm: () => navigation.replace('MainTabs'),
+      });
       return;
     }
 
@@ -74,43 +78,70 @@ const LoginScreen = ({ navigation }: any) => {
 
     const message = messages[result.reason];
     if (message) {
-      Alert.alert('Thông báo', message);
+      showAlert({ title: 'Thông báo', message, type: 'warning' });
     }
+  };
+
+  const validatePhone = (phoneStr: string) => {
+    const phoneRegex = /^(0[3|5|7|8|9][0-9]{8}|0[0-9]{9})$/;
+    return phoneRegex.test(phoneStr.trim());
   };
 
   // ── Password Login ───────────────────────────────────────────────────────────
   const handlePasswordLogin = async () => {
-    if (!phone.trim() || !password.trim()) {
-      Alert.alert('Thông báo', 'Vui lòng nhập số điện thoại và mật khẩu.');
+    const trimmedPhone = phone.trim();
+    const trimmedPass = password.trim();
+
+    if (!trimmedPhone || !trimmedPass) {
+      showAlert({ title: 'Thông báo', message: 'Vui lòng nhập số điện thoại và mật khẩu.', type: 'warning' });
       return;
     }
 
-    // TODO: Replace with real API call to .NET backend:
-    //   const res = await axios.post('/api/auth/login', { phone, password });
-    //   const { token } = res.data;
+    if (!validatePhone(trimmedPhone)) {
+      showAlert({ title: 'Số điện thoại không hợp lệ', message: 'Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0 (Ví dụ: 0901234567).', type: 'warning' });
+      return;
+    }
 
-    // ── MOCK: simulate a successful login ─────────────────────────────────────
-    const mockToken = `mock_token_${phone}_${Date.now()}`;
+    if (trimmedPass.length < 6) {
+      showAlert({ title: 'Mật khẩu không hợp lệ', message: 'Mật khẩu phải có ít nhất 6 ký tự.', type: 'warning' });
+      return;
+    }
 
-    // Save token so Face ID can be used next time
-    await saveTokenForBiometric(mockToken, phone);
-    setBiometricAvailable(true);
-
-    navigation.replace('MainTabs');
+    try {
+      // Try connecting to ASP.NET Core Web API Backend
+      const res = await apiAuth.login(trimmedPhone, trimmedPass);
+      await saveTokenForBiometric(res.token, trimmedPhone);
+      setBiometricAvailable(true);
+      navigation.replace('MainTabs');
+    } catch (err: any) {
+      showAlert({
+        title: 'Đăng nhập thất bại',
+        message: err.message || 'Không thể đăng nhập. Vui lòng kiểm tra lại số điện thoại hoặc mật khẩu.',
+        type: 'error',
+        confirmText: 'Thử lại',
+      });
+    }
   };
 
   // ── SMS Login ────────────────────────────────────────────────────────────────
   const handleSMSLogin = () => {
-    if (!phone.trim()) {
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
       Alert.alert('Thông báo', 'Vui lòng nhập số điện thoại trước khi đăng nhập bằng SMS.');
       return;
     }
+
+    if (!validatePhone(trimmedPhone)) {
+      Alert.alert('Số điện thoại không hợp lệ', 'Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0 (Ví dụ: 0901234567).');
+      return;
+    }
+
     Alert.alert(
       'Xác thực SMS',
-      `Chúng tôi sẽ gửi mã OTP đến số: ${phone}`,
+      `Chúng tôi sẽ gửi mã OTP đến số: ${trimmedPhone}`,
       [
         { text: 'Hủy', style: 'cancel' },
-        { text: 'Tiếp tục', onPress: () => navigation.navigate('OTP', { phone }) },
+        { text: 'Tiếp tục', onPress: () => navigation.navigate('OTP', { phone: trimmedPhone }) },
       ]
     );
   };

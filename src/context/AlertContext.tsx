@@ -1,7 +1,8 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import React, { createContext, useState, useContext, ReactNode, useRef, useEffect } from 'react';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { useSettings } from './SettingsContext';
 
 type AlertType = 'success' | 'error' | 'warning' | 'info';
 
@@ -27,34 +28,47 @@ const AlertContext = createContext<AlertContextType>({
 export const AlertProvider = ({ children }: { children: ReactNode }) => {
   const [visible, setVisible] = useState(false);
   const [config, setConfig] = useState<AlertOptions | null>(null);
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
 
   const showAlert = (options: AlertOptions) => {
     setConfig(options);
     setVisible(true);
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, tension: 70, friction: 9, useNativeDriver: true }),
+      Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
   };
 
   const hideAlert = () => {
-    setVisible(false);
-    setTimeout(() => setConfig(null), 300); // clear after animation
+    Animated.parallel([
+      Animated.timing(scaleAnim, { toValue: 0.85, duration: 180, useNativeDriver: true }),
+      Animated.timing(opacityAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => {
+      setVisible(false);
+      setConfig(null);
+    });
   };
 
   const handleConfirm = () => {
+    const action = config?.onConfirm;
     hideAlert();
-    if (config?.onConfirm) config.onConfirm();
+    if (action) setTimeout(action, 200);
   };
 
   const handleCancel = () => {
+    const action = config?.onCancel;
     hideAlert();
-    if (config?.onCancel) config.onCancel();
+    if (action) setTimeout(action, 200);
   };
 
   const getIcon = () => {
     switch (config?.type) {
-      case 'success': return { name: 'checkmark-circle', color: '#10B981' };
-      case 'error': return { name: 'close-circle', color: '#EF4444' };
-      case 'warning': return { name: 'warning', color: '#F59E0B' };
+      case 'success': return { name: 'checkmark-circle-sharp', color: '#10B981', bg: '#D1FAE5' };
+      case 'error': return { name: 'close-circle-sharp', color: '#EF4444', bg: '#FEE2E2' };
+      case 'warning': return { name: 'warning-sharp', color: '#F59E0B', bg: '#FEF3C7' };
       case 'info':
-      default: return { name: 'information-circle', color: COLORS.primary };
+      default: return { name: 'information-circle-sharp', color: COLORS.primary, bg: '#DBEAFE' };
     }
   };
 
@@ -64,36 +78,52 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
     <AlertContext.Provider value={{ showAlert }}>
       {children}
       
-      <Modal visible={visible} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={[styles.alertBox, SHADOWS.card]}>
-            <View style={[styles.iconWrapper, { backgroundColor: iconData.color + '15' }]}>
-              <Ionicons name={iconData.name as any} size={40} color={iconData.color} />
-            </View>
+      {visible && (
+        <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+          <View style={styles.overlay}>
+            <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]} />
             
-            <Text style={styles.title}>{config?.title}</Text>
-            <Text style={styles.message}>{config?.message}</Text>
-            
-            <View style={styles.buttonRow}>
-              {config?.showCancel && (
-                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCancel}>
-                  <Text style={styles.cancelText}>{config?.cancelText || 'Hủy'}</Text>
+            <Animated.View 
+              style={[
+                styles.alertBox, 
+                SHADOWS.card,
+                { transform: [{ scale: scaleAnim }], opacity: opacityAnim }
+              ]}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: iconData.bg }]}>
+                <Ionicons name={iconData.name as any} size={48} color={iconData.color} />
+              </View>
+              
+              <Text style={[styles.title, !config?.message && { marginBottom: 20 }]}>{config?.title}</Text>
+              {!!config?.message && <Text style={styles.message}>{config.message}</Text>}
+              
+              <View style={styles.buttonRow}>
+                {config?.showCancel && (
+                  <TouchableOpacity 
+                    style={[styles.button, styles.cancelButton]} 
+                    activeOpacity={0.8}
+                    onPress={handleCancel}
+                  >
+                    <Text style={styles.cancelText}>{config?.cancelText || 'Hủy'}</Text>
+                  </TouchableOpacity>
+                )}
+                
+                <TouchableOpacity 
+                  style={[
+                    styles.button, 
+                    styles.confirmButton, 
+                    { backgroundColor: config?.type === 'error' ? '#EF4444' : config?.type === 'warning' ? '#F59E0B' : COLORS.primary }
+                  ]} 
+                  activeOpacity={0.8}
+                  onPress={handleConfirm}
+                >
+                  <Text style={styles.confirmText}>{config?.confirmText || 'Đồng ý'}</Text>
                 </TouchableOpacity>
-              )}
-              <TouchableOpacity 
-                style={[
-                  styles.button, 
-                  styles.confirmButton, 
-                  { backgroundColor: config?.type === 'error' || config?.type === 'warning' ? '#EF4444' : COLORS.primary }
-                ]} 
-                onPress={handleConfirm}
-              >
-                <Text style={styles.confirmText}>{config?.confirmText || 'Đồng ý'}</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            </Animated.View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </AlertContext.Provider>
   );
 };
@@ -103,16 +133,28 @@ export const useCustomAlert = () => useContext(AlertContext);
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
   },
   alertBox: {
-    backgroundColor: '#fff',
-    width: '80%',
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
     alignItems: 'center',
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
   },
   iconWrapper: {
     width: 80,
@@ -120,21 +162,23 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   message: {
-    fontSize: 15,
-    color: COLORS.placeholder,
+    fontSize: 14,
+    color: '#475569',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
+    fontWeight: '400',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -143,25 +187,32 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    height: 48,
-    borderRadius: 24,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   confirmButton: {
     backgroundColor: COLORS.primary,
+    elevation: 4,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   cancelText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: COLORS.placeholder,
+    color: '#64748B',
   },
   confirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

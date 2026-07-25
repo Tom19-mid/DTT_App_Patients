@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   Modal, Animated, Dimensions, TouchableWithoutFeedback,
-  ScrollView, Pressable, Alert
+  ScrollView, Pressable, ActivityIndicator
 } from 'react-native';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { COLORS, SHADOWS } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
+import { apiMedical } from '../services/apiService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.82;
@@ -40,8 +41,6 @@ interface Props {
   onClose: () => void;
 }
 
-
-
 // ── Main Component ────────────────────────────────────────────────────────────
 const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) => {
   const insets = useSafeAreaInsets();
@@ -52,8 +51,12 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
   const slideAnim  = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
+  const [featuredDoctor, setFeaturedDoctor] = useState<any>(null);
+  const [doctorLoading, setDoctorLoading] = useState(false);
+
   useEffect(() => {
-    if (visible) {
+    if (visible && specialty) {
+      fetchFeaturedDoctor(specialty.id);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }),
         Animated.timing(backdropAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
@@ -64,9 +67,33 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
         Animated.timing(backdropAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, specialty]);
+
+  const fetchFeaturedDoctor = async (specialtyId?: number) => {
+    try {
+      setDoctorLoading(true);
+      const doctors = await apiMedical.getDoctors(specialtyId);
+      if (doctors && doctors.length > 0) {
+        setFeaturedDoctor(doctors[0]);
+      } else {
+        setFeaturedDoctor(null);
+      }
+    } catch (e) {
+      console.log('Error fetching featured doctor:', e);
+      setFeaturedDoctor({
+        fullName: 'BS. CKII Nguyễn Văn A',
+        degree: 'Chuyên khoa I Nội tổng quát',
+        rating: 4.9,
+        reviewCount: 120
+      });
+    } finally {
+      setDoctorLoading(false);
+    }
+  };
 
   if (!specialty) return null;
+
+  const displaySpecialtyName = specialty.nameKey ? t(specialty.nameKey) : specialty.name;
 
   return (
     <Modal
@@ -97,7 +124,7 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* ── Header ── */}
           <View style={styles.header}>
-            <Text style={[styles.title, isDarkMode && { color: '#F3F4F6' }]}>{specialty.nameKey ? t(specialty.nameKey) : specialty.name}</Text>
+            <Text style={[styles.title, isDarkMode && { color: '#F3F4F6' }]}>{displaySpecialtyName}</Text>
             <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDarkMode && { backgroundColor: '#374151' }]} activeOpacity={0.7}>
               <Ionicons name="close" size={20} color="red" />
             </TouchableOpacity>
@@ -127,9 +154,9 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
                   onClose();
                   setTimeout(() => {
                     if (item.labelKey === 'book_appointment') {
-                      navigation.navigate('Booking', { specialty: specialty.nameKey || specialty.name });
+                      navigation.navigate('Booking', { specialty: displaySpecialtyName });
                     } else if (item.labelKey === 'doctors') {
-                      navigation.navigate('SpecialtyDoctors', { specialty });
+                      navigation.navigate('SpecialtyDoctors', { specialty: { name: displaySpecialtyName, id: specialty.id } });
                     } else if (['exam_ticket', 'prescription', 'invoice', 'tests'].includes(item.labelKey)) {
                       if (!isVerified) {
                         showAlert({
@@ -147,7 +174,7 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
                       
                       navigation.navigate('MedicalRecords', {
                         initialTab: tabId,
-                        specialty: specialty.nameKey || specialty.name
+                        specialty: displaySpecialtyName
                       });
                     }
                   }, 300);
@@ -161,35 +188,43 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
             ))}
           </View>
 
-          {/* ── Bác sĩ chuyên khoa ── */}
+          {/* ── Bác sĩ chuyên khoa tiêu biểu (Lấy từ API) ── */}
           <View style={styles.appointmentSection}>
             <Text style={[styles.sectionTitle, isDarkMode && { color: '#F3F4F6' }]}>{t('specialty_doctors')}</Text>
             
-            <TouchableOpacity 
-              style={[styles.doctorCard, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]} 
-              activeOpacity={0.8}
-              onPress={() => {
-                onClose();
-                navigation.navigate('SpecialtyDoctors', { specialty });
-              }}
-            >
-              <View style={[styles.doctorAvatarPlaceholder, isDarkMode && { backgroundColor: '#1F2937' }]}>
-                <FontAwesome5 name="user-md" size={24} color={isDarkMode ? '#60A5FA' : COLORS.primary} />
-              </View>
-              
-              <View style={styles.doctorInfo}>
-                <Text style={[styles.doctorName, isDarkMode && { color: '#F3F4F6' }]}>BS. CKII Nguyễn Văn A</Text>
-                <Text style={[styles.doctorSpecialty, isDarkMode && { color: '#9CA3AF' }]}>{specialty.nameKey ? t(specialty.nameKey) : specialty.name}</Text>
-                <View style={styles.doctorRatingRow}>
-                  <Ionicons name="star" size={14} color="#FBBF24" />
-                  <Text style={[styles.doctorRating, isDarkMode && { color: '#9CA3AF' }]}>4.9 (120 {t('reviews')})</Text>
+            {doctorLoading ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: 16 }} />
+            ) : featuredDoctor ? (
+              <TouchableOpacity 
+                style={[styles.doctorCard, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]} 
+                activeOpacity={0.8}
+                onPress={() => {
+                  onClose();
+                  navigation.navigate('SpecialtyDoctors', { specialty: { name: displaySpecialtyName, id: specialty.id } });
+                }}
+              >
+                <View style={[styles.doctorAvatarPlaceholder, isDarkMode && { backgroundColor: '#1F2937' }]}>
+                  <FontAwesome5 name="user-md" size={24} color={isDarkMode ? '#60A5FA' : COLORS.primary} />
                 </View>
-              </View>
+                
+                <View style={styles.doctorInfo}>
+                  <Text style={[styles.doctorName, isDarkMode && { color: '#F3F4F6' }]}>{featuredDoctor.fullName || 'BS. CKII Nguyễn Văn A'}</Text>
+                  <Text style={[styles.doctorSpecialty, isDarkMode && { color: '#9CA3AF' }]}>{featuredDoctor.degree || displaySpecialtyName}</Text>
+                  <View style={styles.doctorRatingRow}>
+                    <Ionicons name="star" size={14} color="#FBBF24" />
+                    <Text style={[styles.doctorRating, isDarkMode && { color: '#9CA3AF' }]}>{featuredDoctor.rating || 5.0} ({featuredDoctor.reviewCount || 10} {t('reviews')})</Text>
+                  </View>
+                </View>
 
-              <View style={styles.bookBtnSmall}>
-                <Text style={styles.bookBtnSmallText}>{t('book_btn')}</Text>
-              </View>
-            </TouchableOpacity>
+                <View style={styles.bookBtnSmall}>
+                  <Text style={styles.bookBtnSmallText}>{t('book_btn')}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <Text style={{ fontSize: 13, color: COLORS.subtext, fontStyle: 'italic', marginVertical: 8 }}>
+                Chưa có thông tin bác sĩ tiêu biểu.
+              </Text>
+            )}
           </View>
         </ScrollView>
       </Animated.View>

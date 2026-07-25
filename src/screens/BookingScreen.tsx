@@ -5,6 +5,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import DraggableChat from '../components/DraggableChat';
 import { useSettings } from '../context/SettingsContext';
+import { apiMedical } from '../services/apiService';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const SPECIALTIES = [
@@ -143,16 +144,41 @@ const BookingScreen = ({ route, navigation }: any) => {
     setExpandedId(expandedId === id ? null : id);
   };
 
+  const [apiDoctors, setApiDoctors] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchApiDoctors();
+  }, [selectedSpecialty]);
+
+  const fetchApiDoctors = async () => {
+    try {
+      const doctors = await apiMedical.getDoctors();
+      if (doctors && doctors.length > 0) {
+        setApiDoctors(doctors);
+      }
+    } catch (e) {
+      console.log('Error fetching doctors in BookingScreen:', e);
+    }
+  };
+
   const currentDoctors = useMemo(() => {
     const dateStr = `${selectedDate.getDate()}/${selectedDate.getMonth() + 1}/${selectedDate.getFullYear()}`;
+    if (apiDoctors && apiDoctors.length > 0) {
+      return apiDoctors.map((doc: any) => ({
+        id: doc.doctorId,
+        title: doc.degree || 'BS. CK1',
+        name: doc.fullName ? doc.fullName.toUpperCase() : 'BÁC SĨ DTT',
+        slots: `3 ${t('time_slots')}`,
+        date: dateStr,
+        image: 'https://img.freepik.com/free-photo/smiling-asian-male-doctor-with-stethoscope-standing-crossed-arms-looking-camera-confident-medical-professional-clinic-hospital-background_1258-109033.jpg',
+        timeSlots: ['7:30 - 8:30', '8:30 - 9:30', '13:30 - 14:30']
+      }));
+    }
+
     if (selectedSpecialty === t('pediatrics') || selectedSpecialty === 'Nhi khoa') {
       return [
         { id: 1, title: 'BS. CKII', name: 'LÊ THỊ BÉ', slots: `2 ${t('time_slots')}`, date: dateStr, timeSlots: ['7:30 - 8:30', '13:30 - 14:30'] },
         { id: 2, title: 'ThS. BS', name: 'PHẠM VĂN D', slots: `3 ${t('time_slots')}`, date: dateStr, timeSlots: ['8:30 - 9:30', '10:30 - 11:30', '14:30 - 15:30'] }
-      ];
-    } else if (selectedSpecialty === t('obstetrics') || selectedSpecialty === 'Phụ & Sản khoa') {
-      return [
-        { id: 1, title: 'BS. CKII', name: 'NGUYỄN THỊ C', slots: `4 ${t('time_slots')}`, date: dateStr, timeSlots: ['7:30 - 8:30', '9:30 - 10:30', '13:30 - 14:30', '15:30 - 16:30'] }
       ];
     } else {
       return [
@@ -160,7 +186,7 @@ const BookingScreen = ({ route, navigation }: any) => {
         { id: 2, title: 'BS. CKII', name: 'NGUYỄN VĂN B', slots: `5 ${t('time_slots')}`, date: dateStr, timeSlots: ['7:30 - 8:30', '8:30 - 9:30', '9:30 - 10:30', '13:30 - 14:30', '15:30 - 16:30'] },
       ];
     }
-  }, [selectedSpecialty, selectedDate]);
+  }, [selectedSpecialty, selectedDate, apiDoctors, t]);
 
   return (
     <SafeAreaView style={styles.safeArea}>

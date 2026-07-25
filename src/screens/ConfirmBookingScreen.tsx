@@ -3,12 +3,33 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 
 const ConfirmBookingScreen = ({ route, navigation }: any) => {
   const { type, doctorName, specialty, date, time, packageName, price } = route.params || {};
   const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const { addRecentService } = useAuth();
 
   const handleConfirm = () => {
+    // Record into dynamic Recent Services
+    if (type === 'doctor') {
+      addRecentService({
+        name: doctorName || 'Bác sĩ chuyên khoa',
+        detail: specialty || 'Nội tổng quát',
+        icon: 'user-md',
+        type: 'doctor',
+        doctorName,
+        specialtyName: specialty,
+      });
+    } else {
+      addRecentService({
+        name: packageName || 'Gói khám sức khỏe',
+        detail: price || 'DTT Healthcare',
+        icon: 'medkit',
+        type: 'package',
+      });
+    }
+
     // Show success modal
     setSuccessModalVisible(true);
   };

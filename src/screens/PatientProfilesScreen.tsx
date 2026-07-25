@@ -22,9 +22,14 @@ const PatientProfilesScreen = ({ navigation }: any) => {
           <Ionicons name="arrow-back" size={24} color={isDarkMode ? '#F3F4F6' : COLORS.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, isDarkMode && { color: '#F3F4F6' }]}>{t('patient_records_management')}</Text>
-        <TouchableOpacity onPress={handleAddNewProfile}>
-          <Ionicons name="add-circle" size={26} color={isDarkMode ? '#818CF8' : COLORS.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => navigation.navigate('QRScanner')} style={styles.headerBtn}>
+            <Ionicons name="qr-code-outline" size={22} color={isDarkMode ? '#818CF8' : COLORS.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleAddNewProfile} style={styles.headerBtn}>
+            <Ionicons name="add-circle" size={26} color={isDarkMode ? '#818CF8' : COLORS.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
@@ -62,16 +67,30 @@ const PatientProfilesScreen = ({ navigation }: any) => {
             <View style={[styles.cardDivider, isDarkMode && { backgroundColor: '#4B5563' }]} />
 
             <View style={styles.cardFooter}>
-              <View style={styles.statusBox}>
-                <Ionicons 
-                  name={profile.isVerified ? "checkmark-circle" : "time"} 
-                  size={18} 
-                  color={profile.isVerified ? (isDarkMode ? '#34D399' : "#10B981") : (isDarkMode ? '#FBBF24' : "#F59E0B")} 
-                />
-                <Text style={[styles.statusText, { color: profile.isVerified ? (isDarkMode ? '#34D399' : "#10B981") : (isDarkMode ? '#FBBF24' : "#F59E0B") }]}>
-                  {profile.isVerified ? t('verified') : t('unverified')}
-                </Text>
-              </View>
+              {(() => {
+                const status = profile.verificationStatus || (profile.isVerified ? 'verified' : 'pending');
+                let color = isDarkMode ? '#FBBF24' : '#F59E0B';
+                let iconName: any = 'time';
+                let textKey = 'unverified';
+                let label = t('unverified') || 'Đang chờ xác thực';
+
+                if (status === 'verified') {
+                  color = isDarkMode ? '#34D399' : '#10B981';
+                  iconName = 'checkmark-circle';
+                  label = t('verified') || 'Đã xác thực';
+                } else if (status === 'rejected') {
+                  color = isDarkMode ? '#F87171' : '#EF4444';
+                  iconName = 'close-circle';
+                  label = 'Bị từ chối';
+                }
+
+                return (
+                  <View style={styles.statusBox}>
+                    <Ionicons name={iconName} size={18} color={color} />
+                    <Text style={[styles.statusText, { color }]}>{label}</Text>
+                  </View>
+                );
+              })()}
               <Ionicons name="chevron-forward" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
             </View>
           </TouchableOpacity>
@@ -102,14 +121,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
+  backButton: { padding: 4 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerBtn: { padding: 2 },
   container: {
     padding: 16,
     paddingBottom: 100,
