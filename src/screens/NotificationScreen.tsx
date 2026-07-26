@@ -1,76 +1,69 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
-
-const MOCK_NOTIFICATIONS = [
-  {
-    id: '1',
-    type: 'appointment',
-    title: 'Nhắc nhở lịch khám sắp tới',
-    message: 'Bạn có lịch khám Nội Tổng quát với BS. Nguyễn Văn A vào lúc 09:30 ngày 26/07/2026.',
-    time: '2 giờ trước',
-    read: false,
-    icon: 'calendar',
-    color: '#3B82F6',
-    bgColor: '#EFF6FF',
-  },
-  {
-    id: '2',
-    type: 'result',
-    title: 'Đã có kết quả khám',
-    message: 'Kết quả xét nghiệm máu của bạn vào ngày 15/05/2026 đã có. Vui lòng kiểm tra trong Hồ sơ sức khỏe.',
-    time: '1 ngày trước',
-    read: true,
-    icon: 'flask',
-    color: '#10B981',
-    bgColor: '#ECFDF5',
-  },
-  {
-    id: '3',
-    type: 'promotion',
-    title: 'Ưu đãi 20% gói Tầm soát',
-    message: 'Giảm ngay 20% cho gói Tầm soát Ung thư trong tháng 7 này tại DTT Healthcare. Đặt lịch ngay!',
-    time: '3 ngày trước',
-    read: true,
-    icon: 'gift',
-    color: '#F59E0B',
-    bgColor: '#FFFBEB',
-  },
-  {
-    id: '4',
-    type: 'system',
-    title: 'Chào mừng bạn đến với DTT Healthcare',
-    message: 'Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi. Chúc bạn một ngày tốt lành!',
-    time: '1 tuần trước',
-    read: true,
-    icon: 'information-circle',
-    color: '#6B7280',
-    bgColor: '#F3F4F6',
-  }
-];
+import { apiNotifications, NotificationItem } from '../services/apiService';
 
 const NotificationScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
-  const { isVerified } = useAuth();
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { currentUser, isVerified } = useAuth();
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();
+
+  const fetchNotifications = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    try {
+      const res = await apiNotifications.getByPatient(currentUser.patientId || 2);
+      if (Array.isArray(res)) {
+        setNotifications(res);
+      }
+    } catch (err) {
+      console.log('[NotificationScreen] Failed to fetch live notifications:', err);
+    } finally {
+      setLoading(false);
+      if (isRefresh) setRefreshing(false);
+    }
+  }, [currentUser.patientId]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications(true);
+  };
 
   const filteredNotifications = notifications.filter(
     noti => activeTab === 'all' || !noti.read
   );
 
-  const handleMarkAllAsRead = () => {
+  const handleMarkAllAsRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      await apiNotifications.markAllAsRead(currentUser.patientId || 2);
+    } catch (e) {
+      console.log('Error mark all read:', e);
+    }
   };
 
-  const handlePressNotification = (item: typeof MOCK_NOTIFICATIONS[0]) => {
-    setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
+  const handlePressNotification = async (item: NotificationItem) => {
+    if (!item.read) {
+      setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
+      try {
+        await apiNotifications.markAsRead(item.id);
+      } catch (e) {
+        console.log('Error marking as read:', e);
+      }
+    }
     
     setTimeout(() => {
       if (item.type === 'appointment') {
@@ -100,6 +93,7 @@ const NotificationScreen = ({ navigation }: any) => {
           <Ionicons name="checkmark-done" size={20} color={isDarkMode ? '#60A5FA' : COLORS.primary} />
         </TouchableOpacity>
       </View>
+
 
       {/* ── Tabs ── */}
       <View style={[styles.tabsContainer, isDarkMode && { backgroundColor: '#1F2937', borderBottomColor: '#374151' }]}>
@@ -135,12 +129,24 @@ const NotificationScreen = ({ navigation }: any) => {
           <Ionicons name="notifications-off-outline" size={64} color={isDarkMode ? '#4B5563' : "#E5E7EB"} />
           <Text style={[styles.emptyText, isDarkMode && { color: '#9CA3AF' }]}>{t('no_notifications')}</Text>
         </View>
+      ) : loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={isDarkMode ? '#60A5FA' : COLORS.primary} />
+        </View>
       ) : (
         <FlatList
           data={filteredNotifications}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary]}
+              tintColor={isDarkMode ? '#60A5FA' : COLORS.primary}
+            />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity 
               style={[

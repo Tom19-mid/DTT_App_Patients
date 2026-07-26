@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AuthLayout from '../components/AuthLayout';
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
@@ -130,23 +130,23 @@ const LoginScreen = ({ navigation }: any) => {
   const handleSMSLogin = () => {
     const trimmedPhone = phone.trim();
     if (!trimmedPhone) {
-      Alert.alert('Thông báo', 'Vui lòng nhập số điện thoại trước khi đăng nhập bằng SMS.');
+      showAlert({ title: 'Thông báo', message: 'Vui lòng nhập số điện thoại trước khi đăng nhập bằng SMS.', type: 'info' });
       return;
     }
 
     if (!validatePhone(trimmedPhone)) {
-      Alert.alert('Số điện thoại không hợp lệ', 'Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0 (Ví dụ: 0901234567).');
+      showAlert({ title: 'Số điện thoại không hợp lệ', message: 'Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0 (Ví dụ: 0901234567).', type: 'warning' });
       return;
     }
 
-    Alert.alert(
-      'Xác thực SMS',
-      `Chúng tôi sẽ gửi mã OTP đến số: ${trimmedPhone}`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Tiếp tục', onPress: () => navigation.navigate('OTP', { phone: trimmedPhone }) },
-      ]
-    );
+    showAlert({
+      title: '📱 Xác thực SMS',
+      message: `Chúng tôi sẽ gửi mã OTP đến số:\n\n${trimmedPhone}`,
+      type: 'info',
+      confirmText: 'Tiếp tục',
+      cancelText: 'Hủy',
+      onConfirm: () => navigation.navigate('OTP', { phone: trimmedPhone }),
+    });
   };
 
   return (

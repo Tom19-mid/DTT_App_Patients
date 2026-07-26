@@ -147,16 +147,16 @@ const BookingScreen = ({ route, navigation }: any) => {
   const [doctorSchedules, setDoctorSchedules] = useState<any[]>([]);
   const [schedulesLoading, setSchedulesLoading] = useState(false);
 
-  // Map specialty name → specialtyId (matches backend DB)
   const getSpecialtyId = (specialty: string): number | undefined => {
-    if (specialty.includes('Nội') || specialty.includes('General')) return 1;
-    if (specialty.includes('Nhi') || specialty.includes('Pediatric')) return 2;
-    if (specialty.includes('Phụ') || specialty.includes('Sản') || specialty.includes('Obstetric')) return 3;
-    if (specialty.includes('Xương') || specialty.includes('Khớp') || specialty.includes('Musculoskeletal')) return 4;
-    if (specialty.includes('Tim') || specialty.includes('Cardi')) return 5;
-    if (specialty.includes('Thần') || specialty.includes('Neurology')) return 6;
-    if (specialty.includes('Da') || specialty.includes('Dermatology')) return 7;
-    if (specialty.includes('Hình') || specialty.includes('Imaging')) return 8;
+    const s = specialty.toLowerCase();
+    if (s.includes('nội') || s.includes('general')) return 1;
+    if (s.includes('nhi') || s.includes('pediatric')) return 2;
+    if (s.includes('phụ') || s.includes('sản') || s.includes('obstetric')) return 3;
+    if (s.includes('cơ') || s.includes('xương') || s.includes('khớp') || s.includes('musculoskeletal')) return 4;
+    if (s.includes('tim') || s.includes('cardi')) return 5;
+    if (s.includes('thần') || s.includes('neurology')) return 6;
+    if (s.includes('da') || s.includes('dermatology')) return 7;
+    if (s.includes('hình') || s.includes('imaging')) return 8;
     return undefined;
   };
 

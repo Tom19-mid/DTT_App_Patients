@@ -1,22 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
+import { BASE_URL } from '../services/apiService';
 
 const AccountSettingsScreen = ({ navigation }: any) => {
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();
+  const { currentUser, setCurrentUser } = useAuth();
   const [biometricsEnabled, setBiometricsEnabled] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const handleSave = () => {
-    showAlert({
-      title: t('success'),
-      message: t('account_updated'),
-      type: 'success',
-      onConfirm: () => navigation.goBack()
-    });
+  // Bind real user data from AuthContext
+  const [fullName, setFullName] = useState(currentUser.fullName || '');
+  const [email, setEmail] = useState(currentUser.email || '');
+
+  const handleSave = async () => {
+    if (!fullName.trim()) {
+      showAlert({ title: 'Thiếu thông tin', message: 'Vui lòng nhập họ tên của bạn.', type: 'warning' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/auth/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: currentUser.patientId,
+          fullName: fullName.trim(),
+          email: email.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCurrentUser(prev => ({ ...prev, fullName: fullName.trim(), email: email.trim() }));
+        showAlert({
+          title: '✅ Cập nhật thành công',
+          message: 'Thông tin hồ sơ của bạn đã được lưu.',
+          type: 'success',
+          onConfirm: () => navigation.goBack()
+        });
+      } else {
+        showAlert({ title: 'Lỗi', message: data.message || 'Không thể cập nhật thông tin.', type: 'error' });
+      }
+    } catch {
+      showAlert({ title: 'Lỗi kết nối', message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại.', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -26,8 +60,10 @@ const AccountSettingsScreen = ({ navigation }: any) => {
           <Ionicons name="arrow-back" size={24} color={isDarkMode ? '#F3F4F6' : COLORS.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, isDarkMode && { color: '#F3F4F6' }]}>{t('account_info')}</Text>
-        <TouchableOpacity onPress={handleSave}>
-          <Text style={[styles.saveText, isDarkMode && { color: '#60A5FA' }]}>{t('save')}</Text>
+        <TouchableOpacity onPress={handleSave} disabled={loading}>
+          {loading ? <ActivityIndicator size="small" color={COLORS.primary} /> : (
+            <Text style={[styles.saveText, isDarkMode && { color: '#60A5FA' }]}>{t('save')}</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -39,16 +75,16 @@ const AccountSettingsScreen = ({ navigation }: any) => {
               <Ionicons name="camera" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
-          <Text style={[styles.usernameText, isDarkMode && { color: '#F3F4F6' }]}>NGUYỄN ABC</Text>
+          <Text style={[styles.usernameText, isDarkMode && { color: '#F3F4F6' }]}>{currentUser.fullName?.toUpperCase()}</Text>
         </View>
 
         <View style={styles.formGroup}>
           <Text style={[styles.label, isDarkMode && { color: '#D1D5DB' }]}>{t('username_phone')}</Text>
           <View style={[styles.inputWrapper, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]}>
             <Ionicons name="call-outline" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={styles.inputIcon} />
-            <TextInput 
-              style={[styles.input, isDarkMode && { color: '#F3F4F6' }]} 
-              value="0900031245" 
+            <TextInput
+              style={[styles.input, isDarkMode && { color: '#F3F4F6' }]}
+              value={currentUser.phone}
               editable={false}
             />
             <Ionicons name="lock-closed" size={16} color="#9CA3AF" />
@@ -60,9 +96,10 @@ const AccountSettingsScreen = ({ navigation }: any) => {
           <Text style={[styles.label, isDarkMode && { color: '#D1D5DB' }]}>{t('display_name')}</Text>
           <View style={[styles.inputWrapper, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]}>
             <Ionicons name="person-outline" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={styles.inputIcon} />
-            <TextInput 
-              style={[styles.input, isDarkMode && { color: '#F3F4F6' }]} 
-              defaultValue="NGUYỄN ABC" 
+            <TextInput
+              style={[styles.input, isDarkMode && { color: '#F3F4F6' }]}
+              value={fullName}
+              onChangeText={setFullName}
               placeholderTextColor={isDarkMode ? '#9CA3AF' : COLORS.placeholder}
               placeholder={t('enter_display_name')}
             />
@@ -73,9 +110,10 @@ const AccountSettingsScreen = ({ navigation }: any) => {
           <Text style={[styles.label, isDarkMode && { color: '#D1D5DB' }]}>{t('email')}</Text>
           <View style={[styles.inputWrapper, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]}>
             <Ionicons name="mail-outline" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={styles.inputIcon} />
-            <TextInput 
-              style={[styles.input, isDarkMode && { color: '#F3F4F6' }]} 
-              defaultValue="nguyenabc@gmail.com" 
+            <TextInput
+              style={[styles.input, isDarkMode && { color: '#F3F4F6' }]}
+              value={email}
+              onChangeText={setEmail}
               placeholderTextColor={isDarkMode ? '#9CA3AF' : COLORS.placeholder}
               placeholder={t('enter_email')}
               keyboardType="email-address"
@@ -97,7 +135,7 @@ const AccountSettingsScreen = ({ navigation }: any) => {
               <Text style={[styles.settingDesc, isDarkMode && { color: '#9CA3AF' }]}>{t('biometrics_desc')}</Text>
             </View>
           </View>
-          <Switch 
+          <Switch
             value={biometricsEnabled} 
             onValueChange={setBiometricsEnabled} 
             trackColor={{ false: isDarkMode ? '#4B5563' : '#D1D5DB', true: isDarkMode ? '#60A5FA' : COLORS.primary }}

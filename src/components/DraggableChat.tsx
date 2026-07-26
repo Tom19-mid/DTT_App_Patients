@@ -114,8 +114,8 @@ export default DraggableChat;
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 185, // above scroll-to-top button (110) + 60px button + 15px gap
-    right: 20,
+    bottom: 105, // lowered to rest right above bottom tabs without overlapping cards
+    right: 16,
     zIndex: 9999,
   },
   button: {

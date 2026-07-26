@@ -48,7 +48,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 // ── Auth APIs ──────────────────────────────────────────────────────────────────
 export const apiAuth = {
   login: (phone: string, password: string) =>
-    request<{ token: string; userId: string; patientId: number; fullName: string; phone: string; email: string; verificationStatus: string }>(
+    request<{ token: string; userId: string; patientId: number; fullName: string; phone: string; email: string; verificationStatus: string; otpCode?: string }>(
       '/auth/login',
       {
         method: 'POST',
@@ -57,13 +57,25 @@ export const apiAuth = {
     ),
 
   register: (fullName: string, phone: string, email: string, password: string) =>
-    request<{ token: string; userId: string; patientId: number; fullName: string; phone: string; email: string; verificationStatus: string }>(
+    request<{ token: string; userId: string; patientId: number; fullName: string; phone: string; email: string; verificationStatus: string; otpCode?: string }>(
       '/auth/register',
       {
         method: 'POST',
         body: JSON.stringify({ fullName, phone, email, password }),
       }
     ),
+
+  updateProfile: (data: { patientId: number; fullName?: string; email?: string; gender?: string; address?: string; healthInsuranceNumber?: string; dateOfBirth?: string }) =>
+    request<{ success: boolean; message: string; fullName: string }>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  changePassword: (phone: string, currentPassword: string, newPassword: string) =>
+    request<{ success: boolean; message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ phone, currentPassword, newPassword }),
+    }),
 };
 
 // ── Medical Data APIs ─────────────────────────────────────────────────────────
@@ -134,6 +146,7 @@ export const apiAppointment = {
       queueNumber: number;
       clinicRoom: string;
       fee: string;
+      isPackage?: boolean;
       createdAt: string;
     }>>(`/appointments/patient/${patientId}`),
 
@@ -188,6 +201,116 @@ export const apiHealthPackage = {
       preferredDate: string;
       queueNumber: number;
     }>(`/healthpackages/${id}/book`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// ── Family Members & Patient Profiles APIs ────────────────────────────────────
+
+export interface ProfileDto {
+  id: string;
+  realId?: number;
+  isOwner?: boolean;
+  name: string;
+  patientId: string;
+  relationship: string;
+  verificationStatus: 'pending' | 'verified' | 'rejected' | 'additional_info';
+  isVerified?: boolean;
+  verificationNote?: string;
+  dob?: string;
+  gender?: string;
+  phone?: string;
+  cccd?: string;
+  bhyt?: string;
+}
+
+export const apiFamilyMembers = {
+  getByPatient: (patientId: number) =>
+    request<ProfileDto[]>(`/familymembers/patient/${patientId}`),
+
+  create: (data: {
+    ownerPatientId: number;
+    name: string;
+    relationship: string;
+    dob?: string;
+    gender?: string;
+    phone?: string;
+    cccd?: string;
+    bhyt?: string;
+  }) =>
+    request<{ success: boolean; message: string; profile?: ProfileDto }>('/familymembers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: {
+    realId?: number;
+    isOwner?: boolean;
+    name?: string;
+    relationship?: string;
+    dob?: string;
+    gender?: string;
+    phone?: string;
+    cccd?: string;
+    bhyt?: string;
+  }) =>
+    request<{ success: boolean; message: string }>(`/familymembers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    request<{ success: boolean; message: string }>(`/familymembers/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// ── Notification APIs ─────────────────────────────────────────────────────────
+
+export interface NotificationItem {
+  id: string;
+  type: 'appointment' | 'result' | 'promotion' | 'system' | string;
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  icon: string;
+  color: string;
+  bgColor: string;
+}
+
+export const apiNotifications = {
+  getByPatient: (patientId: number) =>
+    request<NotificationItem[]>(`/notifications/patient/${patientId}`),
+
+  markAsRead: (id: string | number) =>
+    request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PUT' }),
+
+  markAllAsRead: (patientId: number) =>
+    request<{ success: boolean; count: number }>(`/notifications/patient/${patientId}/read-all`, { method: 'PUT' }),
+};
+
+// ── Medical Records & Invoices APIs ───────────────────────────────────────────
+
+export interface MedicalRecordsData {
+  phieu_kham?: any[];
+  toa_thuoc?: any[];
+  xet_nghiem?: any[];
+  sieu_am?: any[];
+  hoa_don?: any[];
+}
+
+export const apiMedicalRecords = {
+  getByPatient: (patientId: number) =>
+    request<MedicalRecordsData>(`/medicalrecords/patient/${patientId}`),
+};
+
+// ── Patients & QR Linking APIs ────────────────────────────────────────────────
+
+export const apiPatients = {
+  linkByQr: (data: { patientId: string; verifyCode: string; ownerPatientId?: number }) =>
+    request<{ success: boolean; message: string; profile?: ProfileDto }>('/patients/link-by-qr', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

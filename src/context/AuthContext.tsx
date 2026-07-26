@@ -1,9 +1,12 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { apiFamilyMembers } from '../services/apiService';
 
 export type VerificationStatus = 'pending' | 'verified' | 'rejected';
 
 export interface PatientProfile {
   id: string;
+  realId?: number;
+  isOwner?: boolean;
   name: string;
   patientId: string;
   relationship: string;
@@ -19,7 +22,9 @@ export interface PatientProfile {
 
 const MOCK_PROFILES: PatientProfile[] = [
   {
-    id: '1',
+    id: 'owner_2',
+    realId: 2,
+    isOwner: true,
     name: 'ĐẶNG NGUYỄN',
     patientId: '#000002',
     relationship: 'Bản thân',
@@ -30,31 +35,6 @@ const MOCK_PROFILES: PatientProfile[] = [
     phone: '0909123456',
     cccd: '079099123456',
     bhyt: 'DN4797912345678'
-  },
-  {
-    id: '2',
-    name: 'NGUYỄN VĂN D',
-    patientId: '#000045',
-    relationship: 'Bố',
-    verificationStatus: 'pending',
-    isVerified: false,
-    dob: '15/03/1970',
-    gender: 'Nam',
-    phone: '0912345678',
-    cccd: '079070999888'
-  },
-  {
-    id: '3',
-    name: 'NGUYỄN THỊ E',
-    patientId: '#000088',
-    relationship: 'Mẹ',
-    verificationStatus: 'rejected',
-    isVerified: false,
-    verificationNote: 'Số CCCD không trùng khớp với dữ liệu cơ sở dữ liệu quốc gia.',
-    dob: '10/08/1973',
-    gender: 'Nữ',
-    phone: '0987654321',
-    cccd: '079073111222'
   }
 ];
 
@@ -131,6 +111,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profiles, setProfiles] = useState<PatientProfile[]>(MOCK_PROFILES);
   const [recentServices, setRecentServices] = useState<RecentServiceItem[]>(INITIAL_RECENT_SERVICES);
 
+  // Load patient profiles from backend DB whenever patientId changes
+  useEffect(() => {
+    let isMounted = true;
+    if (currentUser && currentUser.patientId) {
+      apiFamilyMembers.getByPatient(currentUser.patientId)
+        .then(res => {
+          if (isMounted && res && Array.isArray(res) && res.length > 0) {
+            const loadedProfiles: PatientProfile[] = res.map((p: any) => ({
+              id: p.id,
+              realId: p.realId,
+              isOwner: p.isOwner,
+              name: p.name,
+              patientId: p.patientId,
+              relationship: p.relationship,
+              verificationStatus: (p.verificationStatus as VerificationStatus) || 'pending',
+              isVerified: p.isVerified || p.verificationStatus === 'verified',
+              verificationNote: p.verificationNote,
+              dob: p.dob,
+              gender: p.gender,
+              phone: p.phone,
+              cccd: p.cccd,
+              bhyt: p.bhyt,
+            }));
+            setProfiles(loadedProfiles);
+          }
+        })
+        .catch(err => {
+          console.log('[AuthContext] Failed to fetch real family profiles:', err);
+        });
+    }
+    return () => { isMounted = false; };
+  }, [currentUser.patientId]);
+
   const login = (userData: any) => {
     const name = userData.fullName || 'Người Dùng';
     const parts = name.trim().split(' ');
@@ -154,25 +167,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setCurrentUser(loggedUser);
     setIsVerified(loggedUser.verificationStatus === 'verified');
-
-    // Automatically synchronize the primary profile ('Bản thân') with this logged in user
-    setProfiles(prev => prev.map(p => p.relationship === 'Bản thân' ? {
-      ...p,
-      name: loggedUser.fullName.toUpperCase(),
-      phone: loggedUser.phone,
-      patientId: `#${String(loggedUser.patientId).padStart(6, '0')}`,
-      verificationStatus: 'verified',
-      isVerified: true
-    } : p));
   };
 
   const logout = () => {
-    // Reset to initial state or handle logout
     setCurrentUser(defaultUser);
   };
 
-  // Sync the 'Bản thân' profile's verification status with global state and currentUser
-  React.useEffect(() => {
+  // Keep primary profile ("Bản thân") synced with currentUser state if offline
+  useEffect(() => {
     setProfiles(prev => prev.map(p => p.relationship === 'Bản thân' ? {
       ...p,
       name: currentUser.fullName.toUpperCase(),
@@ -183,18 +185,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } : p));
   }, [isVerified, currentUser]);
 
-  const addProfile = (data: Omit<PatientProfile, 'id' | 'patientId' | 'verificationStatus' | 'isVerified'>) => {
+  const addProfile = async (data: Omit<PatientProfile, 'id' | 'patientId' | 'verificationStatus' | 'isVerified'>) => {
+    const tempId = Math.random().toString(36).substring(7);
     const newProfile: PatientProfile = {
       ...data,
-      id: Math.random().toString(36).substring(7),
-      patientId: `#0000${Math.floor(Math.random() * 90) + 10}`,
+      id: tempId,
+      patientId: `#F${Math.floor(Math.random() * 90000) + 10000}`,
       verificationStatus: 'pending',
       isVerified: false,
     };
     setProfiles(prev => [...prev, newProfile]);
+
+    try {
+      const res = await apiFamilyMembers.create({
+        ownerPatientId: currentUser.patientId,
+        name: data.name,
+        relationship: data.relationship,
+        dob: data.dob,
+        gender: data.gender,
+        phone: data.phone,
+        cccd: data.cccd,
+        bhyt: data.bhyt,
+      });
+      if (res && res.success && res.profile) {
+        setProfiles(prev => prev.map(p => p.id === tempId ? {
+          id: res.profile!.id,
+          realId: res.profile!.realId,
+          isOwner: res.profile!.isOwner,
+          name: res.profile!.name,
+          patientId: res.profile!.patientId,
+          relationship: res.profile!.relationship,
+          verificationStatus: (res.profile!.verificationStatus as VerificationStatus) || 'pending',
+          isVerified: res.profile!.isVerified,
+          dob: res.profile!.dob,
+          gender: res.profile!.gender,
+          phone: res.profile!.phone,
+          cccd: res.profile!.cccd,
+          bhyt: res.profile!.bhyt,
+        } : p));
+      }
+    } catch (e) {
+      console.log('[AuthContext] Failed to save profile to DB:', e);
+    }
   };
 
-  const updateProfile = (id: string, updates: Partial<PatientProfile>) => {
+  const updateProfile = async (id: string, updates: Partial<PatientProfile>) => {
+    const target = profiles.find(p => p.id === id);
     setProfiles(prev => prev.map(p => {
       if (p.id === id) {
         const updated = { ...p, ...updates };
@@ -205,10 +241,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return p;
     }));
+
+    try {
+      await apiFamilyMembers.update(id, {
+        realId: target?.realId,
+        isOwner: target?.isOwner || target?.relationship === 'Bản thân',
+        name: updates.name,
+        relationship: updates.relationship,
+        dob: updates.dob,
+        gender: updates.gender,
+        phone: updates.phone,
+        cccd: updates.cccd,
+        bhyt: updates.bhyt,
+      });
+    } catch (e) {
+      console.log('[AuthContext] Failed to update profile in DB:', e);
+    }
   };
 
-  const deleteProfile = (id: string) => {
+  const deleteProfile = async (id: string) => {
     setProfiles(prev => prev.filter(p => p.id !== id));
+    try {
+      await apiFamilyMembers.delete(id);
+    } catch (e) {
+      console.log('[AuthContext] Failed to delete profile in DB:', e);
+    }
   };
 
   const addRecentService = (item: Omit<RecentServiceItem, 'id' | 'time'> & { time?: string }) => {

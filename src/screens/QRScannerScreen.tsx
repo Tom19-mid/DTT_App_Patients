@@ -7,9 +7,12 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
+import { apiPatients } from '../services/apiService';
 
 /**
  * QRScannerScreen — Quét mã QR từ thẻ/biên lai bệnh nhân để liên kết hồ sơ.
+
  *
  * QR Code chuẩn từ bệnh viện sẽ có định dạng:
  *   DTT-PATIENT:{patient_id}:{verify_code}
@@ -20,6 +23,7 @@ import { useSettings } from '../context/SettingsContext';
  */
 const QRScannerScreen = ({ navigation, route }: any) => {
   const { isDarkMode } = useSettings();
+  const { currentUser } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -66,7 +70,7 @@ const QRScannerScreen = ({ navigation, route }: any) => {
   }
 
   // ── Handle QR scan result ──────────────────────────────────────────────
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (scanned || processing) return;
     setScanned(true);
     setProcessing(true);
@@ -77,7 +81,7 @@ const QRScannerScreen = ({ navigation, route }: any) => {
     if (parts.length !== 3 || parts[0] !== 'DTT-PATIENT') {
       Alert.alert(
         'Mã QR không hợp lệ',
-        'Vui lòng quét mã QR trên thẻ bệnh nhân hoặc biên lai do bệnh viện DTT Healthcare cấp.',
+        'Vui lòng quét mã QR trên thẻ bệnh nhân hoặc biên lai do bệnh viện DTT Healthcare cấp.\n\n(Mẹo test: dùng định dạng DTT-PATIENT:999:TEST)',
         [{ text: 'Thử lại', onPress: () => { setScanned(false); setProcessing(false); } }]
       );
       return;
@@ -86,24 +90,35 @@ const QRScannerScreen = ({ navigation, route }: any) => {
     const patientId = parts[1];
     const verifyCode = parts[2];
 
-    // ── MOCK: Simulate API call to link profile ──────────────────────────
-    // TODO: Replace with real API call:
-    //   const res = await axios.post('/api/patients/link-by-qr', { patientId, verifyCode });
-    //   if (res.data.success) { ... }
-
-    setTimeout(() => {
+    try {
+      const res = await apiPatients.linkByQr({
+        patientId,
+        verifyCode,
+        ownerPatientId: currentUser?.patientId || 2
+      });
       setProcessing(false);
-      Alert.alert(
-        '✅ Liên kết thành công!',
-        `Hồ sơ bệnh nhân #${patientId} đã được liên kết với tài khoản của bạn. Toàn bộ lịch sử y tế sẽ được đồng bộ vào ứng dụng.`,
-        [
-          {
-            text: 'Xem hồ sơ',
-            onPress: () => navigation.replace('PatientProfiles'),
-          },
-        ]
-      );
-    }, 1500);
+      if (res && res.success) {
+        Alert.alert(
+          '✅ Liên kết thành công!',
+          res.message || `Hồ sơ bệnh nhân #${patientId} đã được liên kết với tài khoản của bạn và đồng bộ y tế.`,
+          [
+            {
+              text: 'Xem hồ sơ',
+              onPress: () => navigation.replace('PatientProfiles'),
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Lỗi liên kết', res?.message || 'Không thể liên kết hồ sơ lúc này.', [
+          { text: 'Đóng', onPress: () => { setScanned(false); } }
+        ]);
+      }
+    } catch (e: any) {
+      setProcessing(false);
+      Alert.alert('Lỗi kết nối', 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.', [
+        { text: 'Đóng', onPress: () => { setScanned(false); } }
+      ]);
+    }
   };
 
   return (

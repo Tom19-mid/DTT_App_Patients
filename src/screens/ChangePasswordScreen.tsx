@@ -1,23 +1,27 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
+import { BASE_URL } from '../services/apiService';
 
 const ChangePasswordScreen = ({ navigation }: any) => {
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();
+  const { currentUser } = useAuth();
   
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   
   const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
       showAlert({ title: 'Lỗi', message: 'Vui lòng điền đầy đủ các trường thông tin.', type: 'error' });
       return;
@@ -31,14 +35,33 @@ const ChangePasswordScreen = ({ navigation }: any) => {
       return;
     }
 
-    showAlert({
-      title: t('success') || 'Thành công',
-      message: 'Mật khẩu của bạn đã được thay đổi an toàn.',
-      type: 'success',
-      onConfirm: () => {
-        navigation.goBack();
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: currentUser.phone,
+          currentPassword: oldPassword,
+          newPassword: newPassword,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showAlert({
+          title: '🔒 Đổi mật khẩu thành công',
+          message: 'Mật khẩu của bạn đã được cập nhật an toàn.',
+          type: 'success',
+          onConfirm: () => navigation.goBack(),
+        });
+      } else {
+        showAlert({ title: 'Không thể đổi mật khẩu', message: data.message || 'Mật khẩu hiện tại không chính xác.', type: 'error' });
       }
-    });
+    } catch {
+      showAlert({ title: 'Lỗi kết nối', message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại.', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderPasswordInput = (label: string, value: string, setValue: (val: string) => void, show: boolean, setShow: (val: boolean) => void) => (

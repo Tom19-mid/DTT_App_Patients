@@ -166,7 +166,7 @@ const CalendarScreen = ({ navigation }: any) => {
           doctor = bsMatch[0].trim();
         }
         const nameOnly = doctor.replace(/^(?:ThS\.|BS\.|TS\.|GS\.|PGS\.)\s*(?:CKI{1,2}\s*|CKII\s*|BSCK[12]\s*)?/i, '').trim();
-        doctor = nameOnly || doctor || 'Phạm Tuấn Kiệt';
+        doctor = nameOnly || doctor || 'Bác sĩ chuyên khoa';
       }
 
       // Format dateString to YYYY-MM-DD for calendar compatibility
@@ -211,7 +211,7 @@ const CalendarScreen = ({ navigation }: any) => {
         time: timeStr,
         statusKey: statusKey,
         statusColor: statusColor,
-        clinicRoom: isPkg ? '' : (app.clinicRoom || (app.doctorId === 4 ? 'Phòng 205' : 'Phòng 102')),
+        clinicRoom: isPkg ? '' : (app.clinicRoom || 'Phòng Khám Chuyên Khoa'),
         fee: app.fee || '250.000đ',
         isUpcoming: isUpcoming,
         isPackage: isPkg,
@@ -474,7 +474,7 @@ const CalendarScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          <View style={{ paddingHorizontal: 16 }}>
+          <View style={{ paddingHorizontal: 16, paddingBottom: 20 }}>
             {activeTab === 'upcoming' ? (
               <>
                 <Text style={[styles.managementDate, isDarkMode && { color: '#F3F4F6' }]}>
@@ -887,15 +887,25 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   appointmentCardInner: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20, // Khoảng cách rộng rã giữa các thẻ lịch khám
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   appointmentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   appointmentSpecialty: {
     fontSize: 15,

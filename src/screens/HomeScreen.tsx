@@ -52,6 +52,16 @@ const RECENT_SERVICES = [
   { id: 3, name: 'Gói Khám Nam', detail: 'DTT Healthcare', time: 'Đã lưu', icon: 'medkit', type: 'package' },
 ];
 
+const getShortName = (fullName?: string) => {
+  if (!fullName || fullName.trim() === '') return 'Khách hàng';
+  const trimmed = fullName.trim();
+  const words = trimmed.split(/\s+/);
+  if (words.length > 2) {
+    return words.slice(-2).join(' ');
+  }
+  return trimmed;
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 const HomeScreen = ({ navigation }: any) => {
   const HAS_APPOINTMENTS = false; // Toggle this to true to see the upcoming appointment card
@@ -131,7 +141,7 @@ const HomeScreen = ({ navigation }: any) => {
               </View>
               <View>
                 <Text style={[styles.greetingText, isDarkMode && { color: '#9CA3AF' }]}>{t('hello')}</Text>
-                <Text style={[styles.userNameText, isDarkMode && { color: '#F3F4F6' }]}>{currentUser?.phone || 'SĐT'}</Text>
+                <Text style={[styles.userNameText, isDarkMode && { color: '#F3F4F6' }]}>{getShortName(currentUser?.fullName)}</Text>
               </View>
             </View>
           </View>

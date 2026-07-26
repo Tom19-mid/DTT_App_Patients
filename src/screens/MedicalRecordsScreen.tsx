@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
+import { apiMedicalRecords } from '../services/apiService';
 
 const TABS = [
   { id: 'phieu-kham', titleKey: 'exam_ticket', icon: 'document-text' },
@@ -13,39 +15,59 @@ const TABS = [
   { id: 'hoa-don', titleKey: 'invoice', icon: 'receipt' },
 ];
 
-const MOCK_RECORDS = {
-  'phieu-kham': [
-    { id: 1, date: '21/07/2026', doctor: 'BS. Lê Thị B', clinicKey: 'pediatrics', code: 'PK-20260721-01' },
-    { id: 2, date: '15/05/2026', doctor: 'BS. Nguyễn Văn A', clinicKey: 'general_internal', code: 'PK-20260515-02' },
-    { id: 3, date: '10/02/2026', doctor: 'BS. Nguyễn Thị C', clinicKey: 'obstetrics', code: 'PK-20260210-03' },
-  ],
-  'toa-thuoc': [
-    { id: 1, date: '21/07/2026', doctor: 'BS. Lê Thị B', clinicKey: 'pediatrics', items: 'Paracetamol, Vitamin C', code: 'TT-20260721-01' },
-    { id: 2, date: '15/05/2026', doctor: 'BS. Nguyễn Văn A', clinicKey: 'general_internal', items: 'Amoxicillin, Omeprazole', code: 'TT-20260515-02' },
-  ],
-  'xet-nghiem': [
-    { id: 1, date: '15/05/2026', clinicKey: 'general_internal', type: 'Xét nghiệm máu tổng quát', result: 'Bình thường', code: 'XN-20260515-02' },
-    { id: 2, date: '10/02/2026', clinicKey: 'obstetrics', type: 'Siêu âm thai', result: 'Bình thường', code: 'XN-20260210-03' },
-  ],
-  'sieu-am': [
-    { id: 1, date: '10/02/2026', clinicKey: 'obstetrics', type: 'Siêu âm 4D', result: 'Thai nhi khỏe mạnh', code: 'SA-20260210-01' },
-  ],
-  'hoa-don': [
-    { id: 1, date: '21/07/2026', doctor: 'BS. Lê Thị B', clinicKey: 'pediatrics', items: 'Công khám Nhi khoa, Thuốc', code: 'HD-20260721-01' },
-    { id: 2, date: '15/05/2026', doctor: 'BS. Nguyễn Văn A', clinicKey: 'general_internal', items: 'Công khám Nội TQ, Xét nghiệm máu', code: 'HD-20260515-02' },
-  ]
+const EMPTY_RECORDS = {
+  'phieu-kham': [],
+  'toa-thuoc': [],
+  'xet-nghiem': [],
+  'sieu-am': [],
+  'hoa-don': []
 };
 
 const MedicalRecordsScreen = ({ route, navigation }: any) => {
   const { isDarkMode, t } = useSettings();
-  // Get initial tab from route params, default to 'phieu-kham'
+  const { currentUser } = useAuth();
+
   const initialTab = route.params?.initialTab || 'phieu-kham';
   const filterSpecialty = route.params?.specialty;
   
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [recordsData, setRecordsData] = useState<any>(EMPTY_RECORDS);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchMedicalRecords = useCallback(async (isRefresh = false) => {
+    if (!isRefresh && !recordsData['phieu-kham']?.length) setLoading(true);
+    try {
+      const res = await apiMedicalRecords.getByPatient(currentUser.patientId || 2);
+      if (res) {
+        setRecordsData({
+          'phieu-kham': res.phieu_kham || [],
+          'toa-thuoc': res.toa_thuoc || [],
+          'xet-nghiem': res.xet_nghiem || [],
+          'sieu-am': res.sieu_am || [],
+          'hoa-don': res.hoa_don || [],
+        });
+      }
+    } catch (e) {
+      console.log('[MedicalRecordsScreen] Error fetching medical records:', e);
+      setRecordsData(EMPTY_RECORDS);
+    } finally {
+      setLoading(false);
+      if (isRefresh) setRefreshing(false);
+    }
+  }, [currentUser.patientId]);
+
+  useEffect(() => {
+    fetchMedicalRecords();
+  }, [fetchMedicalRecords]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchMedicalRecords(true);
+  };
 
   const getFilteredRecords = (): any[] => {
-    let records = (MOCK_RECORDS as any)[activeTab] || [];
+    let records = recordsData[activeTab] || [];
     if (filterSpecialty) {
       records = records.filter((r: any) => r.clinicKey === filterSpecialty || t(r.clinicKey) === filterSpecialty);
     }
@@ -96,7 +118,11 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
 
       {/* Content */}
       <View style={styles.contentContainer}>
-        {filteredRecords.length === 0 ? (
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 40 }}>
+            <ActivityIndicator size="large" color={isDarkMode ? '#818CF8' : COLORS.primary} />
+          </View>
+        ) : filteredRecords.length === 0 ? (
           renderEmptyState()
         ) : (
           <FlatList
@@ -104,6 +130,14 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[COLORS.primary]}
+                tintColor={isDarkMode ? '#818CF8' : COLORS.primary}
+              />
+            }
             renderItem={({ item }: any) => (
                 <TouchableOpacity 
                 style={[styles.recordCard, SHADOWS.card, isDarkMode && { backgroundColor: '#1F2937' }]} 
