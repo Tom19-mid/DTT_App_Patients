@@ -115,6 +115,7 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
 
       {/* Sheet */}
       <Animated.View
+        onStartShouldSetResponder={() => true}
         style={[styles.sheet, { paddingBottom: insets.bottom + 8 }, isDarkMode && { backgroundColor: '#1F2937' },
           { transform: [{ translateY: slideAnim }] }]}
       >

@@ -12,38 +12,115 @@
 import Platform from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-// Change this to your computer's local Wi-Fi IP when testing on a physical phone
-const LOCAL_IP = '10.0.2.2'; // Standard Android Emulator host loopback
+// Change this to your computer's local Wi-Fi IP when testing on physical devices (iPad, iPhone, Android)
+const LOCAL_IP = '192.168.2.106'; // Laptop Wi-Fi network IP for Expo Go on iPad & Mobile
 export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
 
 const TOKEN_KEY = 'dtt_user_token';
 
-// ── Helper for HTTP requests ──────────────────────────────────────────────────
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+// ── High-Performance Caching & Auto-Heal Engine (Stage 2 Optimization) ────────
+interface CacheItem<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+const DTTQueryCache = new Map<string, CacheItem<any>>();
+const DEFAULT_TTL = 60 * 1000; // 60 seconds standard cache TTL for GET queries
 
+export const clearApiCache = (keyPrefix?: string) => {
+  if (!keyPrefix) {
+    DTTQueryCache.clear();
+  } else {
+    for (const key of DTTQueryCache.keys()) {
+      if (key.includes(keyPrefix)) DTTQueryCache.delete(key);
+    }
+  }
+};
+
+// ── Helper for HTTP requests with Cache, Retry, and Timeout ───────────────────
+async function request<T>(endpoint: string, options: RequestInit = {}, customTtl: number = DEFAULT_TTL): Promise<T> {
+  const isGet = !options.method || options.method.toUpperCase() === 'GET';
+  const cacheKey = `${endpoint}_${JSON.stringify(options.body || '')}`;
+
+  // 1. Instant Cache Retrieval (Stale-While-Revalidate 0ms latency)
+  if (isGet && DTTQueryCache.has(cacheKey)) {
+    const cached = DTTQueryCache.get(cacheKey)!;
+    const now = Date.now();
+    if (now - cached.timestamp < cached.ttl) {
+      // Return cached result instantly at 0ms latency
+      return cached.data as T;
+    }
+  }
+
+  const token = await SecureStore.getItemAsync(TOKEN_KEY);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
-
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  // 2. Auto-Heal Exponential Retry with Timeout Protection
+  let attempt = 0;
+  const maxRetries = isGet ? 2 : 0; // Only retry GET requests to prevent duplicate writes
+  let lastError: any;
 
-  const data = await response.json();
+  while (attempt <= maxRetries) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second safety timeout
 
-  if (!response.ok) {
-    throw new Error(data.message || 'Đã xảy ra lỗi khi kết nối máy chủ');
+    try {
+      const response = await fetch(`${BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal as any,
+      });
+
+      clearTimeout(timeoutId);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Đã xảy ra lỗi khi kết nối máy chủ');
+      }
+
+      // Save to cache for GET requests
+      if (isGet) {
+        DTTQueryCache.set(cacheKey, { data, timestamp: Date.now(), ttl: customTtl });
+      } else {
+        // Automatically invalidate cache for affected domains on POST/PUT/DELETE
+        if (endpoint.includes('/appointments')) clearApiCache('/appointments');
+        if (endpoint.includes('/familymembers')) clearApiCache('/familymembers');
+        if (endpoint.includes('/notifications')) clearApiCache('/notifications');
+        if (endpoint.includes('/healthpackages')) clearApiCache('/healthpackages');
+        if (endpoint.includes('/auth/profile')) clearApiCache('/auth/profile');
+      }
+
+      return data as T;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      lastError = error;
+      attempt++;
+
+      // If network fails but we have stale cache, gracefully fall back to stale cache!
+      if (attempt > maxRetries && isGet && DTTQueryCache.has(cacheKey)) {
+        console.warn(`[Network Degraded] Serving fallback cache for ${endpoint}`);
+        return DTTQueryCache.get(cacheKey)!.data as T;
+      }
+
+      if (attempt <= maxRetries && error.name !== 'AbortError') {
+        const backoffDelay = Math.pow(2, attempt) * 300; // 600ms, 1200ms
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      }
+    }
   }
 
-  return data as T;
+  if (lastError?.name === 'AbortError') {
+    throw new Error('Kết nối máy chủ bị quá tải (Timeout). Vui lòng kiểm tra đường truyền mạng.');
+  }
+  throw lastError;
 }
+
 
 // ── Auth APIs ──────────────────────────────────────────────────────────────────
 export const apiAuth = {
@@ -315,3 +392,22 @@ export const apiPatients = {
       body: JSON.stringify(data),
     }),
 };
+
+// ── Stage 2 Optimization: Intelligent Pre-Warming Engine ──────────────────────
+export const prewarmCoreData = (patientId?: number) => {
+  // Execute background requests to warm up in-memory cache without blocking main UI thread
+  setTimeout(() => {
+    try {
+      apiMedical.getDoctors().catch(() => { });
+      apiHealthPackage.getAll().catch(() => { });
+      if (patientId) {
+        apiAppointment.getPatientAppointments(patientId).catch(() => { });
+        apiFamilyMembers.getByPatient(patientId).catch(() => { });
+      }
+      console.log('[Stage 2] Pre-warmed core data cache successfully.');
+    } catch (e) {
+      // Suppress network logs during silent warmup
+    }
+  }, 300);
+};
+

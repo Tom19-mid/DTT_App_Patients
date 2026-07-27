@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Image, Pressable, Alert
@@ -7,10 +7,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import DraggableChat from '../components/DraggableChat';
 import SpecialtyBottomSheet from '../components/SpecialtyBottomSheet';
+import GlobalSearchModal from '../components/GlobalSearchModal';
+import GuideAndInfoModal from '../components/GuideAndInfoModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
+import { prewarmCoreData } from '../services/apiService';
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -68,10 +71,20 @@ const HomeScreen = ({ navigation }: any) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const [selectedSpecialty, setSelectedSpecialty] = useState<typeof specialties[0] | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [searchVoiceMode, setSearchVoiceMode] = useState(false);
+  const [guideMode, setGuideMode] = useState<'guide' | 'medical_info' | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const { isVerified, recentServices, addRecentService, currentUser } = useAuth();
   const { showAlert } = useCustomAlert();
   const { language, setLanguage, isDarkMode, setIsDarkMode, t } = useSettings();
+
+  // Stage 2: Intelligent Pre-Fetching to load critical medical data into cache for 0ms screen latency
+  useEffect(() => {
+    if (currentUser?.patientId) {
+      prewarmCoreData(currentUser.patientId);
+    }
+  }, [currentUser?.patientId]);
 
   const handleMedicalRecordNavigation = (initialTab: string) => {
     if (isVerified) {
@@ -171,15 +184,37 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
 
         {/* ── Search Bar ── */}
-        <View style={[styles.searchContainer, SHADOWS.input, isDarkMode && { backgroundColor: '#374151', borderColor: '#4B5563', borderWidth: 0, elevation: 0, shadowOpacity: 0 }]}>
+        <TouchableOpacity 
+          style={[styles.searchContainer, SHADOWS.input, isDarkMode && { backgroundColor: '#374151', borderColor: '#4B5563', borderWidth: 0, elevation: 0, shadowOpacity: 0 }]}
+          activeOpacity={0.9}
+          onPress={() => {
+            setSearchVoiceMode(false);
+            setSearchModalVisible(true);
+          }}
+        >
           <Ionicons name="search-outline" size={24} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={styles.searchIcon} />
           <TextInput
             style={[styles.searchInput, isDarkMode && { color: '#F3F4F6' }]}
             placeholder={t('search_placeholder')}
             placeholderTextColor={isDarkMode ? '#9CA3AF' : COLORS.placeholder}
+            editable={false}
+            multiline={false}
+            numberOfLines={1}
+            onPressIn={() => {
+              setSearchVoiceMode(false);
+              setSearchModalVisible(true);
+            }}
           />
-          <Ionicons name="mic-outline" size={24} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={styles.micIcon} />
-        </View>
+          <TouchableOpacity
+            onPress={() => {
+              setSearchVoiceMode(true);
+              setSearchModalVisible(true);
+            }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="mic" size={24} color={COLORS.primary} style={styles.micIcon} />
+          </TouchableOpacity>
+        </TouchableOpacity>
 
         {/* ── Upcoming Appointment ── */}
         {HAS_APPOINTMENTS && (
@@ -331,6 +366,10 @@ const HomeScreen = ({ navigation }: any) => {
                     handleMedicalRecordNavigation('xet-nghiem');
                   } else if (item.id === 2) { // Hóa đơn & Biên lai
                     handleMedicalRecordNavigation('hoa-don');
+                  } else if (item.id === 3) { // Thông tin hướng dẫn
+                    setGuideMode('guide');
+                  } else if (item.id === 4) { // Thông tin y khoa
+                    setGuideMode('medical_info');
                   } else {
                     showAlert({ title: 'Thông báo', message: 'Tính năng đang được phát triển để kết nối CSDL.', type: 'info' });
                   }
@@ -419,6 +458,20 @@ const HomeScreen = ({ navigation }: any) => {
         visible={sheetVisible}
         specialty={selectedSpecialty}
         onClose={closeBottomSheet}
+      />
+      <GlobalSearchModal
+        visible={searchModalVisible}
+        initialVoiceMode={searchVoiceMode}
+        onClose={() => {
+          setSearchModalVisible(false);
+          setSearchVoiceMode(false);
+        }}
+        navigation={navigation}
+      />
+      <GuideAndInfoModal
+        visible={!!guideMode}
+        mode={guideMode}
+        onClose={() => setGuideMode(null)}
       />
     </SafeAreaView>
   );

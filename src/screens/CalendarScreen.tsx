@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Modal, FlatList, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Modal, FlatList, Animated, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import DraggableChat from '../components/DraggableChat';
 import { useSettings } from '../context/SettingsContext';
-import { apiAppointment } from '../services/apiService';
+import { apiAppointment, clearApiCache } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -95,6 +95,7 @@ const CalendarScreen = ({ navigation }: any) => {
   const { isDarkMode, t } = useSettings();
   const { currentUser } = useAuth();
   const [apiAppointments, setApiAppointments] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -102,29 +103,29 @@ const CalendarScreen = ({ navigation }: any) => {
     }, [currentUser?.patientId])
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    clearApiCache('/appointments');
+    await fetchAppointments();
+    setRefreshing(false);
+  }, [currentUser?.patientId]);
+
   const fetchAppointments = async () => {
     try {
-      const targetPatientId = currentUser?.patientId || 2;
-      let data: any[] = [];
-      try {
-        const all = await apiAppointment.getAllAppointments();
-        if (all && Array.isArray(all)) {
-          // Display appointments for this specific user (or include patient 1 and 2 if logged in as default account 2)
-          data = all.filter(a => a.patientId === targetPatientId || (targetPatientId === 2 && a.patientId <= 2));
-        }
-      } catch (err) {
-        data = await apiAppointment.getPatientAppointments(targetPatientId);
+      if (!currentUser?.patientId) {
+        setApiAppointments([]);
+        return;
       }
-      if (!data || data.length === 0) {
-        data = await apiAppointment.getPatientAppointments(targetPatientId);
-      }
-      if (data && data.length > 0) {
+      const targetPatientId = currentUser.patientId;
+      const data = await apiAppointment.getPatientAppointments(targetPatientId);
+      if (data && Array.isArray(data)) {
         setApiAppointments(data);
       } else {
         setApiAppointments([]);
       }
     } catch (e) {
       console.log('Error fetching appointments in CalendarScreen:', e);
+      setApiAppointments([]);
     }
   };
 
@@ -328,6 +329,14 @@ const CalendarScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
       >
 
         {/* Header - Logo */}
@@ -401,48 +410,56 @@ const CalendarScreen = ({ navigation }: any) => {
         {/* Đặt lịch khám Section */}
         <Text style={[styles.sectionTitle, isDarkMode && { color: '#D1D5DB' }]}>{t('book_appointment')}</Text>
         <View style={[styles.card, SHADOWS.card, isDarkMode && { backgroundColor: '#1F2937' }]}>
-          <View style={styles.dropdownWrapper}>
-            <TouchableOpacity
-              style={[styles.dropdownBtn, isDarkMode && { backgroundColor: '#374151' }]}
-              onPress={() => setSpecialtyModalVisible(true)}
-            >
-              <Text style={[styles.dropdownText, isDarkMode && { color: '#F3F4F6' }, selectedSpecialty !== 'choose_specialty' && { color: isDarkMode ? '#60A5FA' : COLORS.primary, fontWeight: 'bold' }]}>
-                {selectedSpecialty === 'choose_specialty' ? t('choose_specialty') : t(selectedSpecialty)}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={isDarkMode ? '#9CA3AF' : COLORS.text} />
-            </TouchableOpacity>
-          </View>
+          {/* Option 1: Theo chuyên khoa */}
+          <TouchableOpacity
+            style={styles.actionRow}
+            activeOpacity={0.7}
+            onPress={() => setSpecialtyModalVisible(true)}
+          >
+            <View style={[styles.smartIconBox, isDarkMode && { backgroundColor: 'rgba(96, 165, 250, 0.15)' }]}>
+              <FontAwesome5 name="hospital-user" size={20} color={isDarkMode ? '#60A5FA' : COLORS.primary} />
+            </View>
+            <View style={styles.actionTextBox}>
+              <Text style={[styles.actionTitleText, isDarkMode && { color: '#F3F4F6' }]}>Đặt khám theo Chuyên khoa</Text>
+              <Text style={[styles.actionSubText, isDarkMode && { color: '#9CA3AF' }]} numberOfLines={1}>Nội tổng quát, Tim mạch, Cơ xương khớp...</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.text} />
+          </TouchableOpacity>
 
+          <View style={[styles.divider, isDarkMode && { backgroundColor: '#374151' }]} />
+
+          {/* Option 2: Theo bác sĩ */}
           <TouchableOpacity
             style={styles.actionRow}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('Booking')}
           >
-            <View style={[styles.actionIconBox, SHADOWS.input, isDarkMode && { backgroundColor: '#374151', borderWidth: 0, elevation: 0, shadowOpacity: 0 }]}>
-              <Ionicons name="calendar-outline" size={24} color={isDarkMode ? '#D1D5DB' : COLORS.text} />
-              <View style={[styles.plusBadge, isDarkMode && { backgroundColor: '#1F2937' }]}>
-                <Ionicons name="add" size={12} color={isDarkMode ? '#60A5FA' : "#fff"} />
-              </View>
+            <View style={[styles.smartIconBox, isDarkMode && { backgroundColor: 'rgba(96, 165, 250, 0.15)' }]}>
+              <FontAwesome5 name="user-md" size={22} color={isDarkMode ? '#60A5FA' : COLORS.primary} />
             </View>
-            <Text style={[styles.actionText, isDarkMode && { color: '#F3F4F6' }]}>{t('book_appointment')}</Text>
-            <Ionicons name="arrow-forward" size={24} color={isDarkMode ? '#9CA3AF' : COLORS.text} />
+            <View style={styles.actionTextBox}>
+              <Text style={[styles.actionTitleText, isDarkMode && { color: '#F3F4F6' }]}>Đặt khám theo Bác sĩ</Text>
+              <Text style={[styles.actionSubText, isDarkMode && { color: '#9CA3AF' }]} numberOfLines={1}>Chọn theo Tiến sĩ, Bác sĩ CKII, Thạc sĩ...</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.text} />
           </TouchableOpacity>
 
           <View style={[styles.divider, isDarkMode && { backgroundColor: '#374151' }]} />
 
+          {/* Option 3: Gói khám */}
           <TouchableOpacity
             style={styles.actionRow}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('Packages')}
           >
-            <View style={[styles.actionIconBox, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]}>
-              <Ionicons name="calendar-outline" size={24} color={isDarkMode ? '#D1D5DB' : COLORS.text} />
-              <View style={[styles.stethoscopeBadge, isDarkMode && { backgroundColor: '#1F2937' }]}>
-                <FontAwesome5 name="stethoscope" size={10} color={isDarkMode ? '#60A5FA' : COLORS.primary} />
-              </View>
+            <View style={[styles.smartIconBox, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
+              <FontAwesome5 name="medkit" size={20} color="#10B981" />
             </View>
-            <Text style={[styles.actionText, isDarkMode && { color: '#F3F4F6' }]}>{t('book_pkg')}</Text>
-            <Ionicons name="arrow-forward" size={24} color={isDarkMode ? '#9CA3AF' : COLORS.text} />
+            <View style={styles.actionTextBox}>
+              <Text style={[styles.actionTitleText, isDarkMode && { color: '#F3F4F6' }]}>Đăng ký Gói khám Sức khỏe</Text>
+              <Text style={[styles.actionSubText, isDarkMode && { color: '#9CA3AF' }]} numberOfLines={1}>Tầm soát ung thư, khám tổng quát Nam & Nữ...</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.text} />
           </TouchableOpacity>
         </View>
 
@@ -596,6 +613,7 @@ const CalendarScreen = ({ navigation }: any) => {
                     onPress={() => {
                       setSelectedSpecialty(item.nameKey);
                       setSpecialtyModalVisible(false);
+                      navigation.navigate('Booking', { specialty: t(item.nameKey), specialtyName: t(item.nameKey) });
                     }}
                   >
                     <View style={styles.specialtyRowLeft}>
@@ -860,6 +878,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: COLORS.primary,
+  },
+  smartIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  actionTextBox: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingRight: 6,
+  },
+  actionTitleText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  actionSubText: {
+    fontSize: 12.5,
+    color: COLORS.placeholder,
+    marginTop: 2,
   },
   divider: {
     height: 1,

@@ -189,7 +189,7 @@ const PackagesScreen = ({ route, navigation }: any) => {
           <Animated.View style={[styles.backdrop, { opacity: backdropAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }) }]} />
         </TouchableWithoutFeedback>
 
-        <Animated.View style={[styles.sheet, isDarkMode && { backgroundColor: '#111827' }, { transform: [{ translateY: slideAnim }] }]}>
+        <Animated.View onStartShouldSetResponder={() => true} style={[styles.sheet, isDarkMode && { backgroundColor: '#111827' }, { transform: [{ translateY: slideAnim }] }]}>
           <View style={[styles.handleBar, isDarkMode && { backgroundColor: '#374151' }]} />
           
           {selectedPackage && (

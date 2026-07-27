@@ -64,8 +64,8 @@ const DOCTORS = [
 
 const BookingScreen = ({ route, navigation }: any) => {
   const { isDarkMode, t } = useSettings();
-  const initialSpecialty = route.params?.specialty || t('specialties');
-  const [expandedId, setExpandedId] = useState<number | null>(3);
+  const initialSpecialty = route.params?.specialty || route.params?.specialtyName || t('specialties');
+  const [expandedId, setExpandedId] = useState<number | null>(route.params?.doctorId || 3);
   const [isSpecialtyModalVisible, setSpecialtyModalVisible] = useState(false);
   const [selectedSpecialty, setSelectedSpecialty] = useState(initialSpecialty);
 

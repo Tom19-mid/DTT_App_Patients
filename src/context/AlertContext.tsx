@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useSettings } from './SettingsContext';
 
-type AlertType = 'success' | 'error' | 'warning' | 'info';
+type AlertType = 'success' | 'error' | 'warning' | 'info' | 'danger' | 'destructive';
 
 interface AlertOptions {
   title: string;
@@ -64,11 +64,18 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
 
   const getIcon = () => {
     switch (config?.type) {
-      case 'success': return { name: 'checkmark-circle-sharp', color: '#10B981', bg: '#D1FAE5' };
-      case 'error': return { name: 'close-circle-sharp', color: '#EF4444', bg: '#FEE2E2' };
-      case 'warning': return { name: 'warning-sharp', color: '#F59E0B', bg: '#FEF3C7' };
+      case 'success':
+        return { name: 'checkmark-circle', color: '#10B981', bg: '#D1FAE5', outerBg: '#ECFDF5', btnColor: '#10B981' };
+      case 'danger':
+      case 'destructive':
+        return { name: 'warning', color: '#DC2626', bg: '#FEE2E2', outerBg: '#FFF1F2', btnColor: '#DC2626' };
+      case 'error':
+        return { name: 'close-circle', color: '#EF4444', bg: '#FEE2E2', outerBg: '#FEF2F2', btnColor: '#EF4444' };
+      case 'warning':
+        return { name: 'alert-circle', color: '#6366F1', bg: '#E0E7FF', outerBg: '#EEF2FF', btnColor: '#6366F1' }; // Electric Indigo for modern notices & reminders
       case 'info':
-      default: return { name: 'information-circle-sharp', color: COLORS.primary, bg: '#DBEAFE' };
+      default:
+        return { name: 'information-circle', color: '#0284C7', bg: '#E0F2FE', outerBg: '#F0F9FF', btnColor: '#0284C7' };
     }
   };
 
@@ -81,17 +88,22 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
       {visible && (
         <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
           <View style={styles.overlay}>
-            <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]} />
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleCancel}>
+              <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]} />
+            </TouchableOpacity>
             
             <Animated.View 
+              onStartShouldSetResponder={() => true}
               style={[
                 styles.alertBox, 
                 SHADOWS.card,
                 { transform: [{ scale: scaleAnim }], opacity: opacityAnim }
               ]}
             >
-              <View style={[styles.iconWrapper, { backgroundColor: iconData.bg }]}>
-                <Ionicons name={iconData.name as any} size={48} color={iconData.color} />
+              <View style={[styles.outerIconRing, { backgroundColor: iconData.outerBg }]}>
+                <View style={[styles.iconWrapper, { backgroundColor: iconData.bg }]}>
+                  <Ionicons name={iconData.name as any} size={44} color={iconData.color} />
+                </View>
               </View>
               
               <Text style={[styles.title, !config?.message && { marginBottom: 20 }]}>{config?.title}</Text>
@@ -112,9 +124,12 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
                   style={[
                     styles.button, 
                     styles.confirmButton, 
-                    { backgroundColor: config?.type === 'error' ? '#EF4444' : config?.type === 'warning' ? '#F59E0B' : COLORS.primary }
+                    { 
+                      backgroundColor: iconData.btnColor,
+                      shadowColor: iconData.btnColor,
+                    }
                   ]} 
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                   onPress={handleConfirm}
                 >
                   <Text style={styles.confirmText}>{config?.confirmText || 'Đồng ý'}</Text>
@@ -135,49 +150,68 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 26,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
   },
   alertBox: {
     backgroundColor: '#FFFFFF',
     width: '100%',
     maxWidth: 340,
-    borderRadius: 28,
+    borderRadius: 30,
     paddingHorizontal: 24,
     paddingTop: 28,
-    paddingBottom: 24,
+    paddingBottom: 26,
     alignItems: 'center',
-    elevation: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
+    elevation: 24,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
   },
-  iconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  outerIconRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  iconWrapper: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 21,
+    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 10,
     textAlign: 'center',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   message: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#475569',
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
+    lineHeight: 23,
+    marginBottom: 26,
+    paddingHorizontal: 4,
     fontWeight: '400',
   },
   buttonRow: {
@@ -187,32 +221,31 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    height: 50,
-    borderRadius: 25,
+    height: 52,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelButton: {
     backgroundColor: '#F1F5F9',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   confirmButton: {
-    backgroundColor: COLORS.primary,
-    elevation: 4,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
   },
   cancelText: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
+    fontWeight: '700',
+    color: '#475569',
   },
   confirmText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 });

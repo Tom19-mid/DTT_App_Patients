@@ -13,7 +13,7 @@ interface SettingsContextType {
 const translations = {
   vi: {
     hello: 'Xin chào',
-    search_placeholder: 'Tìm kiếm: Bác sĩ, chuyên khoa, toa thuốc,...',
+    search_placeholder: 'Tìm Bác sĩ, chuyên khoa, dịch vụ...',
     featured_packages: 'Gói khám nổi bật',
     see_all: 'Xem tất cả',
     services: 'Dịch vụ',
@@ -161,7 +161,7 @@ const translations = {
     invoice: 'Hóa đơn',
     ultrasound: 'Siêu âm',
     no_data: 'Chưa có dữ liệu',
-    search_modal_placeholder: 'Tìm kiếm: Bác sĩ, chuyên khoa, toa thuốc,...',
+    search_modal_placeholder: 'Tìm Bác sĩ, chuyên khoa, dịch vụ...',
     specialty_doctors: 'Bác sĩ chuyên khoa',
     book_btn: 'Đặt khám',
     reviews: 'đánh giá',

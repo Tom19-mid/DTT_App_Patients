@@ -32,7 +32,8 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
     showAlert({
       title: '🗓️ Xác nhận hủy lịch khám',
       message: `Bạn sắp hủy lịch khám:\n\n🏥 Chuyên khoa: ${safeApp.specialtyKey || '—'}\n⏰ Thời gian: ${safeApp.time || '—'}\n\nThao tác này không thể hoàn tác. Bạn có chắc chắn muốn tiếp tục?`,
-      type: 'warning',
+      type: 'danger',
+      showCancel: true,
       confirmText: 'Hủy lịch',
       cancelText: 'Giữ lịch',
       onConfirm: async () => {

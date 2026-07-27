@@ -8,7 +8,11 @@ import { apiAppointment, apiHealthPackage } from '../services/apiService';
 import { useCustomAlert } from '../context/AlertContext';
 
 const ConfirmBookingScreen = ({ route, navigation }: any) => {
-  const { type = 'doctor', doctorName, specialty, date, time, packageName, price = '250.000đ', doctorId, specialtyId, packageId } = route.params || {};
+  const { type = 'doctor', doctorName, specialty, specialtyName, date, time, timeSlot, packageName, price, fee, doctorId, specialtyId, packageId } = route.params || {};
+  const finalSpecialty = specialty || specialtyName || 'Nội tổng quát';
+  const finalTime = time || timeSlot || '08:30 - 09:30';
+  const finalPrice = price || fee || '250.000đ';
+
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bookingResult, setBookingResult] = useState<any>(null);
@@ -24,17 +28,17 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
         res = await apiHealthPackage.bookPackage(packageId, {
           patientId: currentUser?.patientId || 2,
           patientName: currentUser?.fullName || 'Bệnh nhân',
-          priceFormatted: price,
+          priceFormatted: finalPrice,
         });
       } else {
         res = await apiAppointment.createAppointment({
           patientId: currentUser?.patientId || 2,
           doctorId: doctorId || 1,
           doctorName: doctorName || 'BS. CK1 Nguyễn Văn A',
-          specialtyName: specialty || 'Nội tổng quát',
+          specialtyName: finalSpecialty,
           date: date || '26/07/2026',
-          timeSlot: time || '08:30 - 09:30',
-          fee: price || '250.000đ'
+          timeSlot: finalTime,
+          fee: finalPrice
         });
       }
 
@@ -101,7 +105,7 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
               </View>
               <View style={styles.infoRow}>
                 <Ionicons name="medkit-outline" size={20} color={COLORS.primary} />
-                <Text style={styles.infoText}><Text style={styles.label}>Chuyên khoa: </Text>{specialty || 'Nội tổng quát'}</Text>
+                <Text style={styles.infoText}><Text style={styles.label}>Chuyên khoa: </Text>{finalSpecialty}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
@@ -109,7 +113,7 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
               </View>
               <View style={styles.infoRow}>
                 <Ionicons name="time-outline" size={20} color={COLORS.primary} />
-                <Text style={styles.infoText}><Text style={styles.label}>Khung giờ: </Text>{time || '08:30 - 09:30'}</Text>
+                <Text style={styles.infoText}><Text style={styles.label}>Khung giờ: </Text>{finalTime}</Text>
               </View>
             </>
           ) : (
@@ -123,7 +127,7 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
           <View style={styles.divider} />
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Phí khám (Dự kiến)</Text>
-            <Text style={styles.priceValue}>{price || '250.000đ'}</Text>
+            <Text style={styles.priceValue}>{finalPrice}</Text>
           </View>
         </View>
 
@@ -142,8 +146,8 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
 
       {/* Success Modal */}
       <Modal visible={successModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalBox, SHADOWS.card]}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={handleSuccessClose}>
+          <View style={[styles.modalBox, SHADOWS.card]} onStartShouldSetResponder={() => true}>
             <View style={styles.successIconBox}>
               <Ionicons name="checkmark-circle-sharp" size={60} color="#10B981" />
             </View>
@@ -156,7 +160,7 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
               <Text style={styles.modalBtnText}>Xem lịch khám của tôi</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );

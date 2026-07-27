@@ -75,18 +75,6 @@ const ProfileScreen = ({ navigation }: any) => {
             </View>
           </View>
 
-          {/* MOCK TOGGLE FOR DEV TESTING */}
-          {/* TODO [DATABASE]: Remove this entire View block when using real data */}
-          <View style={styles.devToggleWrapper}>
-            <Text style={styles.devToggleText}>[Dev] Đổi trạng thái xác thực:</Text>
-            <Switch 
-              value={isVerified}
-              onValueChange={setIsVerified}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={isVerified ? COLORS.primary : '#f4f3f4'}
-            />
-          </View>
-
           <View style={styles.divider} />
 
           <View style={styles.statsRow}>
