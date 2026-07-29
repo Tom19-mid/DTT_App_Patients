@@ -27,6 +27,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
   };
 
   const isPkg = safeApp.isPackage || safeApp.doctor === '' || safeApp.specialtyKey === 'Khám Tổng Quát Cơ Bản' || (typeof safeApp.specialtyKey === 'string' && (safeApp.specialtyKey.includes('Tầm soát') || safeApp.specialtyKey.includes('Khám Tổng Quát') || safeApp.specialtyKey.includes('Gói khám'))) || false;
+  const isInProgress = safeApp.status === 'InProgress' || safeApp.statusKey === 'in_progress' || safeApp.statusId === 4;
 
   const handleCancel = () => {
     showAlert({
@@ -104,16 +105,18 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
         <View style={styles.statusContainer}>
           <View style={styles.statusBadgeIcon}>
             <Ionicons 
-              name={isHistory ? "checkmark-done-circle" : "checkmark-circle"} 
+              name={isInProgress ? "pulse" : isHistory ? "checkmark-done-circle" : "checkmark-circle"} 
               size={48} 
-              color={isHistory ? COLORS.primary : "#22C55E"} 
+              color={isInProgress ? "#6366F1" : isHistory ? COLORS.primary : "#22C55E"} 
             />
           </View>
-          <Text style={[styles.statusTitle, isHistory && { color: isDarkMode ? '#60A5FA' : COLORS.primary }, !isHistory && isDarkMode && { color: '#34D399' }]}>
-            {isHistory ? t('completed') : t('confirmed')}
+          <Text style={[styles.statusTitle, isInProgress && { color: "#6366F1" }, isHistory && !isInProgress && { color: isDarkMode ? '#60A5FA' : COLORS.primary }, !isHistory && !isInProgress && isDarkMode && { color: '#34D399' }]}>
+            {isInProgress ? (t('in_progress') !== 'in_progress' ? t('in_progress') : "Đang khám lâm sàng") : isHistory ? t('completed') : t('confirmed')}
           </Text>
           <Text style={[styles.statusSubtitle, isDarkMode && { color: '#9CA3AF' }]}>
-            {isHistory 
+            {isInProgress 
+              ? "Bác sĩ đang mời bạn vào phòng khám. Vui lòng chuẩn bị và di chuyển ngay!"
+              : isHistory 
               ? t('thank_you_service') 
               : "Vui lòng đến trước 15 phút để làm thủ tục"}
           </Text>

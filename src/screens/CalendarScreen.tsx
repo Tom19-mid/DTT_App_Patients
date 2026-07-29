@@ -194,6 +194,10 @@ const CalendarScreen = ({ navigation }: any) => {
         statusKey = 'completed';
         statusColor = '#3B82F6';
         isUpcoming = false;
+      } else if (app.statusId === 4 || app.status === 'InProgress' || app.status === 'in_progress') {
+        statusKey = 'in_progress';
+        statusColor = '#6366F1';
+        isUpcoming = true;
       }
 
       // Format display date to DD/MM/YYYY for user-friendly display
@@ -548,7 +552,7 @@ const CalendarScreen = ({ navigation }: any) => {
                     <View style={styles.statusBadge}>
                       <View style={[styles.statusDot, { backgroundColor: app.statusColor }]} />
                       <Text style={[styles.statusText, { color: app.statusColor }]}>
-                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'completed' ? 'Hoàn thành' : 'Đã hủy')}
+                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'completed' ? 'Hoàn thành' : app.statusKey === 'in_progress' ? 'Đang khám' : 'Đã hủy')}
                       </Text>
                     </View>
                   </View>
