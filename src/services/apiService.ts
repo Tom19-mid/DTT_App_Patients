@@ -13,7 +13,7 @@ import Platform from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 // Change this to your computer's local Wi-Fi IP when testing on physical devices (iPad, iPhone, Android)
-const LOCAL_IP = '192.168.2.106'; // Laptop Wi-Fi network IP for Expo Go on iPad & Mobile
+const LOCAL_IP = '192.168.2.100'; // Laptop Wi-Fi network IP for Expo Go on iPad & Mobile
 export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
 
 const TOKEN_KEY = 'dtt_user_token';
@@ -361,11 +361,29 @@ export const apiNotifications = {
   getByPatient: (patientId: number) =>
     request<NotificationItem[]>(`/notifications/patient/${patientId}`),
 
-  markAsRead: (id: string | number) =>
-    request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PUT' }),
+  markAsRead: async (id: string | number) => {
+    DTTQueryCache.forEach((val, key) => {
+      if (key.includes('/notifications/patient/')) {
+        const list = val.data as NotificationItem[];
+        if (Array.isArray(list)) {
+          val.data = list.map(n => n.id === id ? { ...n, read: true } : n);
+        }
+      }
+    });
+    return request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PUT' }).catch(() => ({ success: true }));
+  },
 
-  markAllAsRead: (patientId: number) =>
-    request<{ success: boolean; count: number }>(`/notifications/patient/${patientId}/read-all`, { method: 'PUT' }),
+  markAllAsRead: async (patientId: number) => {
+    DTTQueryCache.forEach((val, key) => {
+      if (key.includes(`/notifications/patient/${patientId}`)) {
+        const list = val.data as NotificationItem[];
+        if (Array.isArray(list)) {
+          val.data = list.map(n => ({ ...n, read: true }));
+        }
+      }
+    });
+    return request<{ success: boolean; count: number }>(`/notifications/patient/${patientId}/read-all`, { method: 'PUT' }).catch(() => ({ success: true, count: 0 }));
+  },
 };
 
 // ── Medical Records & Invoices APIs ───────────────────────────────────────────

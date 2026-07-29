@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
+import { apiNotifications } from '../services/apiService';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -48,6 +50,28 @@ const iconMap: Record<string, { focused: string; outline: string }> = {
 const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
   const { isDarkMode } = useSettings();
+  const { currentUser } = useAuth();
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const checkUnread = async () => {
+      try {
+        if (currentUser?.patientId) {
+          const res = await apiNotifications.getByPatient(currentUser.patientId);
+          if (isMounted && Array.isArray(res)) {
+            setUnreadCount(res.filter(n => !n.read).length);
+          }
+        }
+      } catch (err) { }
+    };
+    checkUnread();
+    const interval = setInterval(checkUnread, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentUser?.patientId, state.index]);
 
   return (
     <View style={[styles.tabBarWrapper, { bottom: Math.max(insets.bottom + 8, 20) }]}>
@@ -71,6 +95,11 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
                   color={isFocused ? (isDarkMode ? '#60A5FA' : COLORS.text) : (isDarkMode ? '#9CA3AF' : COLORS.placeholder)}
                 />
               </View>
+              {route.name === 'Notification' && unreadCount > 0 && (
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -164,5 +193,24 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     backgroundColor: '#E8E8E8',
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
