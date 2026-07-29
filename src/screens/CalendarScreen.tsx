@@ -181,20 +181,24 @@ const CalendarScreen = ({ navigation }: any) => {
         formattedDateString = dateStr.substring(0, 10);
       }
 
-      // Handle status and tabs (raw entity has statusId 1=Confirmed, 2=Completed, 3=Cancelled)
+      // Handle status and tabs (PostgreSQL statusId: 1/2=Confirmed, 3=InProgress, 4=Completed, 5=Cancelled, 6=NoShow)
       let statusKey = 'confirmed';
       let statusColor = '#22C55E';
       let isUpcoming = true;
 
-      if (app.statusId === 3 || app.status === 'Cancelled' || app.status === 'cancelled') {
+      if (app.statusId === 5 || app.status === 'Cancelled' || app.status === 'cancelled') {
         statusKey = 'cancelled';
         statusColor = '#EF4444';
         isUpcoming = false;
-      } else if (app.statusId === 2 || app.status === 'Completed' || app.status === 'completed') {
+      } else if (app.statusId === 4 || app.status === 'Completed' || app.status === 'completed') {
         statusKey = 'completed';
         statusColor = '#3B82F6';
         isUpcoming = false;
-      } else if (app.statusId === 4 || app.status === 'InProgress' || app.status === 'in_progress') {
+      } else if (app.statusId === 6 || app.status === 'NoShow' || app.status === 'noshow' || app.status === 'Expired' || app.status === 'expired' || app.status === 'Quá hạn') {
+        statusKey = 'noshow';
+        statusColor = '#F97316';
+        isUpcoming = false;
+      } else if (app.statusId === 3 || app.status === 'InProgress' || app.status === 'in_progress') {
         statusKey = 'in_progress';
         statusColor = '#6366F1';
         isUpcoming = true;
@@ -552,7 +556,7 @@ const CalendarScreen = ({ navigation }: any) => {
                     <View style={styles.statusBadge}>
                       <View style={[styles.statusDot, { backgroundColor: app.statusColor }]} />
                       <Text style={[styles.statusText, { color: app.statusColor }]}>
-                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'completed' ? 'Hoàn thành' : app.statusKey === 'in_progress' ? 'Đang khám' : 'Đã hủy')}
+                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'completed' ? 'Hoàn thành' : app.statusKey === 'in_progress' ? 'Đang khám' : app.statusKey === 'noshow' ? 'Bỏ khám (Quá hạn)' : 'Đã hủy')}
                       </Text>
                     </View>
                   </View>

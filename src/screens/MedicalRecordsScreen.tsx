@@ -147,7 +147,8 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
                     title: TABS.find(t => t.id === activeTab)?.titleKey ? t(TABS.find(t => t.id === activeTab)!.titleKey) : 'Hồ sơ',
                     specialty: t(item.clinicKey),
                     date: item.date,
-                    patientName: 'Nguyễn Văn Bệnh Nhân'
+                    recordData: item,
+                    patientName: currentUser?.fullName || 'Bệnh nhân'
                   });
                 }}
               >
@@ -164,7 +165,7 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
                 <View style={styles.recordBody}>
                   {activeTab === 'phieu-kham' && (
                     <>
-                      <Text style={[styles.recordTitle, isDarkMode && { color: '#F3F4F6' }]}>{t(item.clinicKey)}</Text>
+                      <Text style={[styles.recordTitle, isDarkMode && { color: '#F3F4F6' }]}>{item.specialtyName || t(item.clinicKey) || item.clinicKey}</Text>
                       <Text style={[styles.recordSub, isDarkMode && { color: '#9CA3AF' }]}>{item.doctor.replace('BS.', t('dr'))}</Text>
                     </>
                   )}

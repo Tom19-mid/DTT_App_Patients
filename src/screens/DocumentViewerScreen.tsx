@@ -5,41 +5,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 const DocumentViewerScreen = ({ route, navigation }: any) => {
-  const { title, specialty, date, patientName } = route.params || {
+  const { title, specialty, date, patientName, recordData } = route.params || {
     title: 'Phiếu khám',
     specialty: 'Chuyên khoa',
     date: '26/07/2026',
     patientName: 'Nguyễn Văn Bệnh Nhân'
   };
 
-  // Generate dynamic mock based on specialty
-  const isNhiKhoa = specialty.includes('Nhi');
-  const isPhuKhoa = specialty.includes('Phụ') || specialty.includes('Sản');
-  const isDaLieu = specialty.includes('Da liễu');
+  const actualPatientName = recordData?.patientName || patientName || 'Nguyễn Văn Bệnh Nhân';
+  const actualDoctorName = recordData?.doctor || 'BS. CKII PHẠM TUẤN KIỆT';
+  const actualCode = recordData?.code || 'PK-20260726-001';
+  const actualDiagnosis = recordData?.diagnosis || 'Khám sức khỏe tổng quát';
+  const actualSymptoms = recordData?.symptoms || 'Khám định kỳ';
+  const actualTreatment = recordData?.treatmentPlan || 'Nghỉ ngơi nhiều, cấp toa thuốc về nhà theo dõi thêm.';
   
-  const mockPatientName = isNhiKhoa ? 'Lê Thị Bé Bi' : isPhuKhoa ? 'Trần Thu Thủy' : isDaLieu ? 'Phạm Văn Da' : patientName;
-  const mockGender = isPhuKhoa ? 'Nữ' : isNhiKhoa ? 'Nữ' : 'Nam';
-  const mockDOB = isNhiKhoa ? '15/08/2020' : isPhuKhoa ? '20/10/1995' : '15/08/1990';
-  const mockDoctorName = isNhiKhoa ? 'BS. Lê Thị B' : isPhuKhoa ? 'BS. Nguyễn Thị C' : 'BS. Nguyễn Văn A';
-  
-  const mockDiagnosis = isNhiKhoa 
-    ? 'Viêm tiểu phế quản / Theo dõi sốt xuất huyết.' 
-    : isPhuKhoa 
-    ? 'Viêm âm đạo do nấm / Khám thai định kỳ.'
-    : isDaLieu
-    ? 'Viêm da cơ địa / Mề đay mãn tính.'
-    : 'Viêm họng cấp / Theo dõi viêm amidan.';
+  const bp = recordData?.bloodPressure ? `Huyết áp: ${recordData.bloodPressure}` : 'Huyết áp: 120/80 mmHg';
+  const pulse = recordData?.heartRate ? `Mạch: ${recordData.heartRate} bpm` : 'Mạch: 80 bpm';
+  const temp = recordData?.temperature ? `Thân nhiệt: ${recordData.temperature}°C` : 'Thân nhiệt: 36.8°C';
 
-  const mockPrescription = isNhiKhoa ? [
-    { name: 'Siro hạ sốt Hapacol 250mg', usage: 'Số lượng: 1 chai. Uống 5ml khi sốt > 38.5 độ.' },
-    { name: 'Oresol', usage: 'Số lượng: 5 gói. Pha 1 gói với 200ml nước, uống thay nước lọc.' }
-  ] : isPhuKhoa ? [
-    { name: 'Vitamin tổng hợp Elevit', usage: 'Số lượng: 30 viên. Ngày 1 viên sau ăn sáng.' },
-    { name: 'Sắt Ferrovit', usage: 'Số lượng: 30 viên. Ngày 1 viên sau ăn trưa.' }
-  ] : [
-    { name: 'Paracetamol 500mg', usage: 'Số lượng: 10 viên. Ngày uống 2 lần, mỗi lần 1 viên sau ăn.' },
-    { name: 'Vitamin C 1000mg', usage: 'Số lượng: 10 viên. Ngày uống 1 viên sủi buổi sáng.' }
-  ];
+  const actualPrescriptions = recordData?.prescriptionItems && recordData.prescriptionItems.length > 0 
+    ? recordData.prescriptionItems 
+    : [
+        { name: 'Amoxicillin 500mg', usage: 'Số lượng: 20 Viên. Uống ngày 2 lần, mỗi lần 1 viên sau ăn.' },
+        { name: 'Paracetamol 500mg', usage: 'Số lượng: 10 Viên. Uống khi sốt cao > 38.5°C' }
+      ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -73,14 +62,12 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
 
             {/* Document Title */}
             <Text style={styles.docMainTitle}>{title.toUpperCase()}</Text>
-            <Text style={styles.docCode}>Mã số: {title === 'Hóa đơn' ? 'HD' : 'PK'}-20260726-001</Text>
+            <Text style={styles.docCode}>Mã số: {actualCode}</Text>
 
             {/* Patient Info */}
             <View style={styles.infoSection}>
-              <Text style={styles.infoRow}><Text style={styles.bold}>Họ và tên người bệnh:</Text> {mockPatientName}</Text>
-              <Text style={styles.infoRow}><Text style={styles.bold}>Ngày sinh:</Text> {mockDOB}  |  <Text style={styles.bold}>Giới tính:</Text> {mockGender}</Text>
-              <Text style={styles.infoRow}><Text style={styles.bold}>Địa chỉ:</Text> 456 Lê Lợi, Phường Bến Nghé, Quận 1, TP.HCM</Text>
-              <Text style={styles.infoRow}><Text style={styles.bold}>Chuyên khoa khám:</Text> {specialty}</Text>
+              <Text style={styles.infoRow}><Text style={styles.bold}>Họ và tên người bệnh:</Text> {actualPatientName}</Text>
+              <Text style={styles.infoRow}><Text style={styles.bold}>Chuyên khoa khám:</Text> {recordData?.specialtyName || specialty}</Text>
               <Text style={styles.infoRow}><Text style={styles.bold}>Ngày khám:</Text> {date}</Text>
             </View>
 
@@ -89,13 +76,13 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
               {title === 'Toa thuốc' ? (
                 <>
                   <Text style={styles.bold}>CHỈ ĐỊNH ĐIỀU TRỊ / ĐƠN THUỐC:</Text>
-                  {mockPrescription.map((item, index) => (
+                  {actualPrescriptions.map((item: any, index: number) => (
                     <View key={index} style={styles.prescriptionItem}>
                       <Text style={styles.itemTitle}>{index + 1}. {item.name}</Text>
                       <Text style={styles.itemUsage}>{item.usage}</Text>
                     </View>
                   ))}
-                  <Text style={styles.note}><Text style={styles.bold}>Lời dặn:</Text> Tái khám sau 7 ngày hoặc khi có dấu hiệu bất thường.</Text>
+                  <Text style={styles.note}><Text style={styles.bold}>Lời dặn:</Text> {actualTreatment}</Text>
                 </>
               ) : title === 'Hóa đơn' ? (
                 <>
@@ -119,10 +106,10 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
               ) : (
                 <>
                   <Text style={styles.bold}>KẾT QUẢ KHÁM BỆNH:</Text>
-                  <Text style={styles.diagnosisText}>- Lý do khám: Bệnh nhân đến khám định kỳ / có triệu chứng mệt mỏi.</Text>
-                  <Text style={styles.diagnosisText}>- Sinh hiệu: Mạch: 80 l/p, Huyết áp: 120/80 mmHg, Nhiệt độ: 37°C.</Text>
-                  <Text style={styles.diagnosisText}>- Chẩn đoán sơ bộ: {mockDiagnosis}</Text>
-                  <Text style={styles.diagnosisText}>- Phương hướng điều trị: Cấp toa thuốc về nhà theo dõi thêm.</Text>
+                  <Text style={styles.diagnosisText}>- Lý do khám: {actualSymptoms}</Text>
+                  <Text style={styles.diagnosisText}>- Sinh hiệu: {pulse}, {bp}, {temp}</Text>
+                  <Text style={styles.diagnosisText}>- Chẩn đoán chính: {actualDiagnosis}</Text>
+                  <Text style={styles.diagnosisText}>- Phương hướng điều trị: {actualTreatment}</Text>
                 </>
               )}
             </View>
@@ -130,10 +117,10 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
             {/* Signature */}
             <View style={styles.signatureSection}>
               <View style={styles.signatureBox}>
-                <Text style={styles.signatureDate}>Ngày 26 tháng 07 năm 2026</Text>
+                <Text style={styles.signatureDate}>Ngày {date}</Text>
                 <Text style={styles.signatureRole}>Bác sĩ điều trị</Text>
                 <View style={styles.signatureMock} />
-                <Text style={styles.signatureName}>{mockDoctorName}</Text>
+                <Text style={styles.signatureName}>{actualDoctorName}</Text>
               </View>
             </View>
           </View>
