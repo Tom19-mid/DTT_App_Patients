@@ -1,19 +1,48 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
+import { apiPatients } from '../services/apiService';
 
 const PatientProfilesScreen = ({ navigation }: any) => {
-  const { profiles } = useAuth();
+  const { profiles, currentUser, updateProfile, setIsVerified } = useAuth();
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();
+
+  // Mỗi khi màn hình được focus, tự động refresh trạng thái xác thực từ server
+  // → Bệnh nhân sẽ thấy "Đã xác thực" ngay sau khi Lễ Tân duyệt CCCD mà không cần đăng xuất
+  useFocusEffect(
+    useCallback(() => {
+      const refreshStatuses = async () => {
+        if (!currentUser?.patientId) return;
+        try {
+          const result = await apiPatients.refreshVerificationStatus(currentUser.patientId);
+          if (result.verified && currentUser.verificationStatus !== 'verified') {
+            // Cập nhật trạng thái isVerified trong AuthContext → UI toàn app refresh
+            setIsVerified(true);
+            // Cập nhật trạng thái hồ sơ chủ trong danh sách hồ sơ
+            const ownerProfile = profiles.find(p => p.isOwner);
+            if (ownerProfile) {
+              updateProfile(ownerProfile.id, {
+                verificationStatus: 'verified',
+                isVerified: true,
+              });
+            }
+          }
+        } catch { }
+      };
+      refreshStatuses();
+    }, [currentUser?.patientId, currentUser?.verificationStatus])
+  );
 
   const handleAddNewProfile = () => {
     navigation.navigate('ProfileDetail', { isNew: true });
   };
+
 
   return (
     <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: '#1F2937' }]}>

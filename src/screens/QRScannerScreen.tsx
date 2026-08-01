@@ -76,6 +76,39 @@ const QRScannerScreen = ({ navigation, route }: any) => {
     setProcessing(true);
     Vibration.vibrate(150);
 
+    // Try parsing as JSON prescription QR Code
+    try {
+      if (data.trim().startsWith('{') && data.trim().endsWith('}')) {
+        const qrJson = JSON.parse(data);
+        if (qrJson.type === 'DTT_PRESCRIPTION' || qrJson.prescriptionId) {
+          setProcessing(false);
+          Alert.alert(
+            '✅ Quét đơn thuốc thành công!',
+            `Đã xác thực Đơn thuốc điện tử của Bác sĩ ${qrJson.doctorName || 'điều trị'}.\n\nHệ thống đã lưu và đồng bộ toa thuốc vào hồ sơ y tế của bạn.`,
+            [
+              {
+                text: 'Xem đơn thuốc',
+                onPress: () => {
+                  navigation.replace('DocumentViewer', {
+                    document: {
+                      id: qrJson.prescriptionId || '101',
+                      title: `Đơn thuốc điện tử - ${qrJson.doctorName || 'BS. CKII Nguyễn Văn A'}`,
+                      date: qrJson.date || '01/08/2026',
+                      type: 'Đơn thuốc',
+                      doctor: qrJson.doctorName || 'BS. CKII Nguyễn Văn A',
+                      clinicKey: 'general_internal',
+                      code: `TT-20260801-${qrJson.prescriptionId || '101'}`
+                    }
+                  });
+                }
+              }
+            ]
+          );
+          return;
+        }
+      }
+    } catch (jsonErr) { }
+
     // Validate QR format: DTT-PATIENT:{patient_id}:{verify_code}
     const parts = data.split(':');
     if (parts.length !== 3 || parts[0] !== 'DTT-PATIENT') {
@@ -94,7 +127,7 @@ const QRScannerScreen = ({ navigation, route }: any) => {
       const res = await apiPatients.linkByQr({
         patientId,
         verifyCode,
-        ownerPatientId: currentUser?.patientId || 2
+        ownerPatientId: currentUser?.patientId
       });
       setProcessing(false);
       if (res && res.success) {

@@ -9,12 +9,14 @@
  * - Physical Phone / LAN: 'http://<YOUR_LOCAL_IP>:5000/api'
  */
 
-import Platform from 'react-native';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-// Change this to your computer's local Wi-Fi IP when testing on physical devices (iPad, iPhone, Android)
-const LOCAL_IP = '192.168.2.100'; // Laptop Wi-Fi network IP for Expo Go on iPad & Mobile
-export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
+// Auto-switch: 10.0.2.2 for Android Emulator, 192.168.2.101 for physical device / Expo Go
+const DEV_SERVER_IP = '192.168.2.101';
+export const BASE_URL = Platform.OS === 'android'
+  ? 'http://10.0.2.2:5000/api'
+  : `http://${DEV_SERVER_IP}:5000/api`;
 
 const TOKEN_KEY = 'dtt_user_token';
 
@@ -409,6 +411,42 @@ export const apiPatients = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  // Lấy thông tin & trạng thái xác thực của bệnh nhân từ DB (dùng khi app cần refresh trạng thái sau khi Lễ Tân duyệt CCCD)
+  getProfile: (patientId: number) =>
+    request<{
+      success: boolean;
+      patient: {
+        id: number;
+        fullName: string;
+        phone: string;
+        cccd: string;
+        bhyt: string;
+        verificationStatus: 'pending' | 'verified' | 'rejected';
+        verificationNote?: string;
+        dob?: string;
+        gender?: string;
+      };
+    }>(`/patients/${patientId}`),
+
+  // Refresh trạng thái xác thực từ server và cập nhật vào cache
+  refreshVerificationStatus: async (patientId: number) => {
+    try {
+      const res = await request<{
+        success: boolean;
+        patient: { verificationStatus: string; cccd?: string; verificationNote?: string };
+      }>(`/patients/${patientId}`);
+      if (res?.success && res.patient) {
+        return {
+          verified: res.patient.verificationStatus === 'verified',
+          verificationStatus: res.patient.verificationStatus as 'pending' | 'verified' | 'rejected',
+          cccd: res.patient.cccd,
+          note: res.patient.verificationNote,
+        };
+      }
+    } catch { }
+    return { verified: false, verificationStatus: 'pending' as const };
+  },
 };
 
 // ── Stage 2 Optimization: Intelligent Pre-Warming Engine ──────────────────────

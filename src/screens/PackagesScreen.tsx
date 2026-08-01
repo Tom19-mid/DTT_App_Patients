@@ -81,7 +81,7 @@ const PackagesScreen = ({ route, navigation }: any) => {
     try {
       setBooking(true);
       const result = await apiHealthPackage.bookPackage(selectedPackage.packageId, {
-        patientId: currentUser?.patientId || 2,
+        patientId: currentUser?.patientId,
         patientName: currentUser?.fullName || 'Bệnh nhân',
         priceFormatted: selectedPackage.priceFormatted,
       });

@@ -26,13 +26,13 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
       let res: any;
       if (type === 'package' && packageId) {
         res = await apiHealthPackage.bookPackage(packageId, {
-          patientId: currentUser?.patientId || 2,
+          patientId: currentUser?.patientId,
           patientName: currentUser?.fullName || 'Bệnh nhân',
           priceFormatted: finalPrice,
         });
       } else {
         res = await apiAppointment.createAppointment({
-          patientId: currentUser?.patientId || 2,
+          patientId: currentUser?.patientId,
           doctorId: doctorId || 1,
           doctorName: doctorName || 'BS. CK1 Nguyễn Văn A',
           specialtyName: finalSpecialty,

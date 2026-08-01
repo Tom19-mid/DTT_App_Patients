@@ -36,9 +36,15 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchMedicalRecords = useCallback(async (isRefresh = false) => {
+    if (!currentUser?.patientId) {
+      setRecordsData(EMPTY_RECORDS);
+      setLoading(false);
+      if (isRefresh) setRefreshing(false);
+      return;
+    }
     if (!isRefresh && !recordsData['phieu-kham']?.length) setLoading(true);
     try {
-      const res = await apiMedicalRecords.getByPatient(currentUser.patientId || 2);
+      const res = await apiMedicalRecords.getByPatient(currentUser.patientId);
       if (res) {
         setRecordsData({
           'phieu-kham': res.phieu_kham || [],
@@ -55,7 +61,7 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
       setLoading(false);
       if (isRefresh) setRefreshing(false);
     }
-  }, [currentUser.patientId]);
+  }, [currentUser?.patientId]);
 
   useEffect(() => {
     fetchMedicalRecords();

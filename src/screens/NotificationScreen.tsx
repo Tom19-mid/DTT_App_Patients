@@ -19,9 +19,15 @@ const NotificationScreen = ({ navigation }: any) => {
   const { isDarkMode, t } = useSettings();
 
   const fetchNotifications = useCallback(async (isRefresh = false) => {
+    if (!currentUser?.patientId) {
+      setNotifications([]);
+      setLoading(false);
+      if (isRefresh) setRefreshing(false);
+      return;
+    }
     if (!isRefresh) setLoading(true);
     try {
-      const res = await apiNotifications.getByPatient(currentUser.patientId || 2);
+      const res = await apiNotifications.getByPatient(currentUser.patientId);
       if (Array.isArray(res)) {
         setNotifications(res);
       }
@@ -31,7 +37,7 @@ const NotificationScreen = ({ navigation }: any) => {
       setLoading(false);
       if (isRefresh) setRefreshing(false);
     }
-  }, [currentUser.patientId]);
+  }, [currentUser?.patientId]);
 
   useEffect(() => {
     fetchNotifications();
@@ -47,9 +53,10 @@ const NotificationScreen = ({ navigation }: any) => {
   );
 
   const handleMarkAllAsRead = async () => {
+    if (!currentUser?.patientId) return;
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     try {
-      await apiNotifications.markAllAsRead(currentUser.patientId || 2);
+      await apiNotifications.markAllAsRead(currentUser.patientId);
     } catch (e) {
       console.log('Error mark all read:', e);
     }

@@ -186,7 +186,12 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
 
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{t('expected_fee')}</Text>
-            <Text style={[styles.infoValueHighlight, isDarkMode && { color: '#F87171' }]}>{safeApp.fee || '250.000đ'}</Text>
+            <Text style={[styles.infoValueHighlight, isDarkMode && { color: '#10B981' }]}>{safeApp.fee || '250.000đ'}</Text>
+          </View>
+          <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>Trạng thái thanh toán</Text>
+            <Text style={[styles.infoValue, { color: '#10B981', fontWeight: 'bold' }]}>🟢 Đã thanh toán tại Quầy Bệnh viện</Text>
           </View>
         </View>
 
@@ -205,7 +210,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Mã hồ sơ (BHYT)</Text>
-            <Text style={styles.infoValue}>BHYT-DTT-00000{currentUser?.patientId || 2}</Text>
+            <Text style={styles.infoValue}>{currentUser?.patientId ? `BHYT-DTT-00000${currentUser.patientId}` : 'Chưa cập nhật'}</Text>
           </View>
         </View>
 

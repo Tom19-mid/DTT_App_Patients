@@ -94,14 +94,16 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
                     </View>
                     <View style={styles.tableRow}>
                       <Text style={[styles.tableCol, {flex: 3}]}>Công khám {specialty}</Text>
-                      <Text style={[styles.tableCol, {flex: 1, textAlign: 'right'}]}>150.000đ</Text>
+                      <Text style={[styles.tableCol, {flex: 1, textAlign: 'right'}]}>250.000đ</Text>
                     </View>
-                    <View style={styles.tableRow}>
-                      <Text style={[styles.tableCol, {flex: 3}]}>Thuốc</Text>
-                      <Text style={[styles.tableCol, {flex: 1, textAlign: 'right'}]}>85.000đ</Text>
-                    </View>
+                    {recordData?.totalAmount && recordData.totalAmount > 250000 ? (
+                      <View style={styles.tableRow}>
+                        <Text style={[styles.tableCol, {flex: 3}]}>Thuốc & Dịch vụ kèm theo</Text>
+                        <Text style={[styles.tableCol, {flex: 1, textAlign: 'right'}]}>{(recordData.totalAmount - 250000).toLocaleString('vi-VN')}đ</Text>
+                      </View>
+                    ) : null}
                   </View>
-                  <Text style={styles.totalText}><Text style={styles.bold}>Tổng cộng:</Text> 235.000 VNĐ</Text>
+                  <Text style={styles.totalText}><Text style={styles.bold}>Tổng cộng:</Text> {recordData?.totalAmount ? `${Number(recordData.totalAmount).toLocaleString('vi-VN')} VNĐ` : '250.000 VNĐ'}</Text>
                 </>
               ) : (
                 <>
