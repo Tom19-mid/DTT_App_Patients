@@ -119,7 +119,10 @@ const RegisterScreen = ({ navigation }: any) => {
   };
 
   return (
-    <AuthLayout title={t('register')} subtitle={t('create_account_desc')}>
+    <AuthLayout>
+      <Text style={[styles.title, isDarkMode && { color: '#F3F4F6' }]}>{t('register')}</Text>
+      <Text style={[styles.subtitle, isDarkMode && { color: '#9CA3AF' }]}>{t('create_account_desc')}</Text>
+
       <CustomInput
         label={t('full_name')}
         placeholder={t('enter_full_name')}
@@ -135,6 +138,7 @@ const RegisterScreen = ({ navigation }: any) => {
         onChangeText={setPhone}
         keyboardType="phone-pad"
         iconName="call-outline"
+        maxLength={10}
       />
 
       <CustomInput
@@ -168,7 +172,7 @@ const RegisterScreen = ({ navigation }: any) => {
       <CustomButton
         title={t('register')}
         onPress={handleRegister}
-        loading={loading}
+        isLoading={loading}
       />
 
       <View style={styles.loginContainer}>
@@ -182,6 +186,20 @@ const RegisterScreen = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: COLORS.placeholder,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',

@@ -176,7 +176,10 @@ const NotificationScreen = ({ navigation }: any) => {
                 <Text style={[styles.message, isDarkMode && { color: '#D1D5DB' }]} numberOfLines={2}>
                   {item.message}
                 </Text>
-                <Text style={[styles.time, isDarkMode && { color: '#9CA3AF' }]}>{item.time}</Text>
+                <View style={styles.timeRow}>
+                  <Ionicons name="time-outline" size={13} color={isDarkMode ? '#9CA3AF' : '#9CA3AF'} style={{ marginRight: 4 }} />
+                  <Text style={[styles.time, isDarkMode && { color: '#9CA3AF' }]}>{item.time}</Text>
+                </View>
               </View>
 
               {!item.read && <View style={styles.unreadDot} />}
@@ -283,9 +286,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 6,
   },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   time: {
     fontSize: 12,
     color: '#9CA3AF',
+    fontWeight: '500',
   },
   unreadDot: {
     width: 10,

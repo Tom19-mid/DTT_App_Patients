@@ -151,6 +151,7 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
                 onPress={() => {
                   navigation.navigate('DocumentViewer', {
                     title: TABS.find(t => t.id === activeTab)?.titleKey ? t(TABS.find(t => t.id === activeTab)!.titleKey) : 'Hồ sơ',
+                    docType: activeTab, // 'phieu-kham' | 'toa-thuoc' | 'xet-nghiem' | 'sieu-am' | 'hoa-don' — dùng để chọn đúng mẫu hiển thị, không phụ thuộc title đã dịch (dễ vỡ khi đổi ngôn ngữ)
                     specialty: t(item.clinicKey),
                     date: item.date,
                     recordData: item,

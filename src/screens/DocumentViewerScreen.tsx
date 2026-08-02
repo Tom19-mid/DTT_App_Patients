@@ -3,10 +3,24 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { BASE_URL } from '../services/apiService';
+
+// Ảnh siêu âm được backend trả về dạng đường dẫn tương đối (vd "/uploads/ultrasound/5/xyz.jpg"),
+// còn BASE_URL của apiService có hậu tố "/api" — phải bỏ đi mới ghép đúng URL ảnh tĩnh.
+const IMAGE_HOST = BASE_URL.replace(/\/api$/, '');
+
+const RESULT_STATUS_LABEL: Record<string, string> = {
+  Pending: 'Đang chờ kết quả',
+  Normal: 'Bình thường',
+  Abnormal: 'Bất thường',
+  Completed: 'Đã hoàn tất',
+  Cancelled: 'Đã hủy chỉ định',
+};
 
 const DocumentViewerScreen = ({ route, navigation }: any) => {
-  const { title, specialty, date, patientName, recordData } = route.params || {
+  const { title, docType, specialty, date, patientName, recordData } = route.params || {
     title: 'Phiếu khám',
+    docType: 'phieu-kham',
     specialty: 'Chuyên khoa',
     date: '26/07/2026',
     patientName: 'Nguyễn Văn Bệnh Nhân'
@@ -73,7 +87,7 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
 
             {/* Content specific to document type */}
             <View style={styles.contentSection}>
-              {title === 'Toa thuốc' ? (
+              {docType === 'toa-thuoc' ? (
                 <>
                   <Text style={styles.bold}>CHỈ ĐỊNH ĐIỀU TRỊ / ĐƠN THUỐC:</Text>
                   {actualPrescriptions.map((item: any, index: number) => (
@@ -84,7 +98,34 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
                   ))}
                   <Text style={styles.note}><Text style={styles.bold}>Lời dặn:</Text> {actualTreatment}</Text>
                 </>
-              ) : title === 'Hóa đơn' ? (
+              ) : docType === 'xet-nghiem' ? (
+                <>
+                  <Text style={styles.bold}>KẾT QUẢ XÉT NGHIỆM:</Text>
+                  <Text style={styles.diagnosisText}>- Loại xét nghiệm: {recordData?.type || 'Chưa xác định'}</Text>
+                  <Text style={styles.diagnosisText}>- Kết quả: {recordData?.result || 'Đang chờ kết quả'}</Text>
+                  <Text style={styles.diagnosisText}>
+                    - Đánh giá: {RESULT_STATUS_LABEL[recordData?.status] || recordData?.status || 'Đang chờ kết quả'}
+                  </Text>
+                </>
+              ) : docType === 'sieu-am' ? (
+                <>
+                  <Text style={styles.bold}>KẾT QUẢ SIÊU ÂM:</Text>
+                  <Text style={styles.diagnosisText}>- Loại siêu âm: {recordData?.type || 'Chưa xác định'}</Text>
+                  <Text style={styles.diagnosisText}>- Kết luận: {recordData?.result || 'Đang chờ kết quả'}</Text>
+                  {Array.isArray(recordData?.imageUrls) && recordData.imageUrls.length > 0 && (
+                    <View style={styles.ultrasoundImageGrid}>
+                      {recordData.imageUrls.map((url: string, idx: number) => (
+                        <Image
+                          key={idx}
+                          source={{ uri: `${IMAGE_HOST}${url}` }}
+                          style={styles.ultrasoundImage}
+                          resizeMode="cover"
+                        />
+                      ))}
+                    </View>
+                  )}
+                </>
+              ) : docType === 'hoa-don' ? (
                 <>
                   <Text style={styles.bold}>CHI TIẾT THANH TOÁN:</Text>
                   <View style={styles.table}>
@@ -92,16 +133,21 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
                       <Text style={[styles.tableCol, {flex: 3, fontWeight: 'bold'}]}>Dịch vụ</Text>
                       <Text style={[styles.tableCol, {flex: 1, fontWeight: 'bold', textAlign: 'right'}]}>Thành tiền</Text>
                     </View>
-                    <View style={styles.tableRow}>
-                      <Text style={[styles.tableCol, {flex: 3}]}>Công khám {specialty}</Text>
-                      <Text style={[styles.tableCol, {flex: 1, textAlign: 'right'}]}>250.000đ</Text>
-                    </View>
-                    {recordData?.totalAmount && recordData.totalAmount > 250000 ? (
+                    {recordData?.invoiceItems && recordData.invoiceItems.length > 0 ? (
+                      // Dữ liệu THẬT từ invoice_items — trước đây màn này tự đoán "250.000đ phí khám +
+                      // phần còn lại là thuốc", sai hoàn toàn với gói khám hoặc ca có phí khác 250k.
+                      recordData.invoiceItems.map((it: { name: string; amount: number }, idx: number) => (
+                        <View key={idx} style={styles.tableRow}>
+                          <Text style={[styles.tableCol, {flex: 3}]}>{it.name}</Text>
+                          <Text style={[styles.tableCol, {flex: 1, textAlign: 'right'}]}>{Number(it.amount).toLocaleString('vi-VN')}đ</Text>
+                        </View>
+                      ))
+                    ) : (
                       <View style={styles.tableRow}>
-                        <Text style={[styles.tableCol, {flex: 3}]}>Thuốc & Dịch vụ kèm theo</Text>
-                        <Text style={[styles.tableCol, {flex: 1, textAlign: 'right'}]}>{(recordData.totalAmount - 250000).toLocaleString('vi-VN')}đ</Text>
+                        <Text style={[styles.tableCol, {flex: 3}]}>Công khám {specialty}</Text>
+                        <Text style={[styles.tableCol, {flex: 1, textAlign: 'right'}]}>{recordData?.totalAmount ? Number(recordData.totalAmount).toLocaleString('vi-VN') : '250.000'}đ</Text>
                       </View>
-                    ) : null}
+                    )}
                   </View>
                   <Text style={styles.totalText}><Text style={styles.bold}>Tổng cộng:</Text> {recordData?.totalAmount ? `${Number(recordData.totalAmount).toLocaleString('vi-VN')} VNĐ` : '250.000 VNĐ'}</Text>
                 </>
@@ -169,6 +215,8 @@ const styles = StyleSheet.create({
   
   contentSection: { marginBottom: 40, minHeight: 150 },
   diagnosisText: { fontSize: 13, color: '#000', marginTop: 8, lineHeight: 22 },
+  ultrasoundImageGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 8 },
+  ultrasoundImage: { width: 100, height: 100, borderRadius: 6, backgroundColor: '#EEE' },
   
   prescriptionItem: { marginTop: 12 },
   itemTitle: { fontSize: 13, fontWeight: 'bold', color: '#000' },

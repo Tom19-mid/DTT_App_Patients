@@ -59,7 +59,7 @@ const ProfileDetailScreen = ({ route, navigation }: any) => {
     });
   };
 
-  const renderInput = (label: string, value: string | undefined, key: keyof PatientProfile, placeholder: string, keyboardType: any = 'default', editable: boolean = true) => (
+  const renderInput = (label: string, value: string | undefined, key: keyof PatientProfile, placeholder: string, keyboardType: any = 'default', editable: boolean = true, maxLength?: number) => (
     <View style={styles.inputGroup}>
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.inputWrapper, !editable && styles.inputDisabled, SHADOWS.input]}>
@@ -70,6 +70,7 @@ const ProfileDetailScreen = ({ route, navigation }: any) => {
           placeholder={placeholder}
           keyboardType={keyboardType}
           editable={editable}
+          maxLength={maxLength}
         />
       </View>
     </View>
@@ -146,8 +147,8 @@ const ProfileDetailScreen = ({ route, navigation }: any) => {
             </View>
 
             {renderInput('Mối quan hệ', formData.relationship, 'relationship', 'Ví dụ: Bố, Mẹ, Con...', 'default', isNew || existingProfile?.relationship !== 'Bản thân')}
-            {renderInput('Số điện thoại', formData.phone, 'phone', 'Nhập số điện thoại', 'phone-pad')}
-            {renderInput('Số CCCD/CMND', formData.cccd, 'cccd', 'Nhập số CCCD', 'numeric', existingProfile?.relationship !== 'Bản thân' || !existingProfile?.isVerified)}
+            {renderInput('Số điện thoại', formData.phone, 'phone', 'Nhập số điện thoại', 'phone-pad', true, 10)}
+            {renderInput('Số CCCD/CMND', formData.cccd, 'cccd', 'Nhập số CCCD', 'numeric', existingProfile?.relationship !== 'Bản thân' || !existingProfile?.isVerified, 12)}
             {renderInput('Mã thẻ BHYT (nếu có)', formData.bhyt, 'bhyt', 'Nhập mã thẻ BHYT')}
           </View>
 

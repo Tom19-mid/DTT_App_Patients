@@ -202,6 +202,19 @@ const CalendarScreen = ({ navigation }: any) => {
         statusKey = 'in_progress';
         statusColor = '#6366F1';
         isUpcoming = true;
+      } else if (app.statusId === 7 || app.status === 'CheckedIn' || app.status === 'checked_in') {
+        statusKey = 'checked_in';
+        statusColor = '#10B981'; // Emerald green/cyan
+        isUpcoming = true;
+      } else if (app.statusId === 8 || app.status === 'WaitingForDoctor' || app.status === 'waiting_for_doctor') {
+        statusKey = 'waiting_for_doctor';
+        statusColor = '#8B5CF6'; // Purple violet
+        isUpcoming = true;
+      } else if (app.statusId === 9 || app.status === 'AwaitingTestResults' || app.status === 'awaiting_test_results') {
+        // Bác sĩ đã chỉ định Xét nghiệm/Siêu âm — bệnh nhân đang ở phòng CLS, chưa quay lại phòng khám
+        statusKey = 'awaiting_test_results';
+        statusColor = '#7C3AED'; // Deep violet
+        isUpcoming = true;
       }
 
       // Format display date to DD/MM/YYYY for user-friendly display
@@ -213,6 +226,8 @@ const CalendarScreen = ({ navigation }: any) => {
 
       return {
         id: app.appointmentId || app.id || Math.random(),
+        statusId: app.statusId,
+        status: app.status,
         dateString: formattedDateString,
         displayDate: displayDate,
         specialtyKey: specialty,
@@ -556,7 +571,7 @@ const CalendarScreen = ({ navigation }: any) => {
                     <View style={styles.statusBadge}>
                       <View style={[styles.statusDot, { backgroundColor: app.statusColor }]} />
                       <Text style={[styles.statusText, { color: app.statusColor }]}>
-                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'completed' ? 'Hoàn thành' : app.statusKey === 'in_progress' ? 'Đang khám' : app.statusKey === 'noshow' ? 'Bỏ khám (Quá hạn)' : 'Đã hủy')}
+                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'checked_in' ? 'Đã Check-in tại quầy' : app.statusKey === 'waiting_for_doctor' ? 'Đã đo sinh hiệu (Chờ khám)' : app.statusKey === 'awaiting_test_results' ? 'Đang chờ kết quả CLS' : app.statusKey === 'completed' ? 'Hoàn thành' : app.statusKey === 'in_progress' ? 'Đang khám' : app.statusKey === 'noshow' ? 'Bỏ khám (Quá hạn)' : 'Đã hủy')}
                       </Text>
                     </View>
                   </View>

@@ -1,10 +1,13 @@
 export const COLORS = {
   primary: '#004bb4',
+  primaryLight: '#e8f0fe',
   background: '#f4f6f9',
   card: '#ffffff',
   text: '#333333',
+  subtext: '#64748B',
   placeholder: '#7D7D7D',
   link: '#004bb4',
+  border: '#E2E8F0',
 };
 
 export const SIZES = {

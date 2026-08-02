@@ -157,6 +157,7 @@ const LoginScreen = ({ navigation }: any) => {
           keyboardType="phone-pad" 
           value={phone}
           onChangeText={setPhone}
+          maxLength={10}
         />
         <CustomInput 
           placeholder={t('password_placeholder')} 

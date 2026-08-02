@@ -27,7 +27,11 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
   };
 
   const isPkg = safeApp.isPackage || safeApp.doctor === '' || safeApp.specialtyKey === 'Khám Tổng Quát Cơ Bản' || (typeof safeApp.specialtyKey === 'string' && (safeApp.specialtyKey.includes('Tầm soát') || safeApp.specialtyKey.includes('Khám Tổng Quát') || safeApp.specialtyKey.includes('Gói khám'))) || false;
-  const isInProgress = safeApp.status === 'InProgress' || safeApp.statusKey === 'in_progress' || safeApp.statusId === 4;
+  const isInProgress = safeApp.status === 'InProgress' || safeApp.statusKey === 'in_progress' || safeApp.statusId === 3;
+  const isCheckedIn = safeApp.status === 'CheckedIn' || safeApp.statusKey === 'checked_in' || safeApp.statusId === 7;
+  const isWaitingForDoctor = safeApp.status === 'WaitingForDoctor' || safeApp.statusKey === 'waiting_for_doctor' || safeApp.statusId === 8;
+  // Bác sĩ đã chỉ định Xét nghiệm/Siêu âm — bệnh nhân đang ở phòng Cận Lâm Sàng, chưa quay lại phòng khám
+  const isAwaitingResults = safeApp.status === 'AwaitingTestResults' || safeApp.statusKey === 'awaiting_test_results' || safeApp.statusId === 9;
 
   const handleCancel = () => {
     showAlert({
@@ -104,21 +108,51 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
         {/* Status Header */}
         <View style={styles.statusContainer}>
           <View style={styles.statusBadgeIcon}>
-            <Ionicons 
-              name={isInProgress ? "pulse" : isHistory ? "checkmark-done-circle" : "checkmark-circle"} 
-              size={48} 
-              color={isInProgress ? "#6366F1" : isHistory ? COLORS.primary : "#22C55E"} 
+            <Ionicons
+              name={
+                isAwaitingResults ? "flask" :
+                isInProgress ? "pulse" :
+                isWaitingForDoctor ? "fitness" :
+                isCheckedIn ? "checkmark-circle" :
+                isHistory ? "checkmark-done-circle" : "checkmark-circle"
+              }
+              size={48}
+              color={
+                isAwaitingResults ? "#7C3AED" :
+                isInProgress ? "#6366F1" :
+                isWaitingForDoctor ? "#8B5CF6" :
+                isCheckedIn ? "#10B981" :
+                isHistory ? COLORS.primary : "#22C55E"
+              }
             />
           </View>
-          <Text style={[styles.statusTitle, isInProgress && { color: "#6366F1" }, isHistory && !isInProgress && { color: isDarkMode ? '#60A5FA' : COLORS.primary }, !isHistory && !isInProgress && isDarkMode && { color: '#34D399' }]}>
-            {isInProgress ? (t('in_progress') !== 'in_progress' ? t('in_progress') : "Đang khám lâm sàng") : isHistory ? t('completed') : t('confirmed')}
+          <Text style={[
+            styles.statusTitle,
+            isAwaitingResults && { color: "#7C3AED" },
+            isInProgress && { color: "#6366F1" },
+            isWaitingForDoctor && { color: "#8B5CF6" },
+            isCheckedIn && { color: "#10B981" },
+            isHistory && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && { color: isDarkMode ? '#60A5FA' : COLORS.primary },
+            !isHistory && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && isDarkMode && { color: '#34D399' }
+          ]}>
+            {isAwaitingResults ? "Đang chờ kết quả Xét nghiệm/Siêu âm" :
+             isInProgress ? (t('in_progress') !== 'in_progress' ? t('in_progress') : "Đang khám lâm sàng") :
+             isWaitingForDoctor ? "Đã đo sinh hiệu — Chờ khám" :
+             isCheckedIn ? "Đã Check-in tại quầy Lễ tân" :
+             isHistory ? t('completed') : t('confirmed')}
           </Text>
           <Text style={[styles.statusSubtitle, isDarkMode && { color: '#9CA3AF' }]}>
-            {isInProgress 
+            {isAwaitingResults
+              ? "Bác sĩ đã chỉ định Xét nghiệm/Siêu âm cho bạn. Vui lòng di chuyển đến phòng Cận Lâm Sàng và chờ Kỹ thuật viên gọi tên."
+              : isInProgress
               ? "Bác sĩ đang mời bạn vào phòng khám. Vui lòng chuẩn bị và di chuyển ngay!"
-              : isHistory 
-              ? t('thank_you_service') 
-              : "Vui lòng đến trước 15 phút để làm thủ tục"}
+              : isWaitingForDoctor
+              ? "Bạn đã hoàn tất kiểm tra mạch & huyết áp. Vui lòng chuẩn bị trước cửa phòng khám Bác sĩ!"
+              : isCheckedIn
+              ? "Thủ tục tiếp đón hoàn tất. Vui lòng ngồi tại khu vực phòng chờ để Điều dưỡng gọi tên đo sinh hiệu."
+              : isHistory
+              ? t('thank_you_service')
+              : "Vui lòng đến trước 15 phút để làm thủ tục tiếp đón tại quầy Lễ tân"}
           </Text>
         </View>
 
