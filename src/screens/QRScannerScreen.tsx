@@ -18,8 +18,7 @@ import { apiPatients } from '../services/apiService';
  *   DTT-PATIENT:{patient_id}:{verify_code}
  * Ví dụ: DTT-PATIENT:12345:ABCXYZ
  *
- * Sau khi quét thành công → gọi API backend để liên kết hồ sơ.
- * (Hiện tại dùng MOCK, sau thay bằng API thật)
+ * Sau khi quét thành công → gọi API backend (POST /api/patients/link-by-qr) để liên kết hồ sơ.
  */
 const QRScannerScreen = ({ navigation, route }: any) => {
   const { isDarkMode } = useSettings();

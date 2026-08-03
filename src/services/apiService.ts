@@ -207,6 +207,25 @@ export const apiMedical = {
     }>>(`/doctors/schedules?${doctorId ? `doctorId=${doctorId}&` : ''}${specialtyId ? `specialtyId=${specialtyId}&` : ''}${dateStr ? `dateStr=${dateStr}` : ''}`),
 };
 
+export interface PatientAppointmentDto {
+  appointmentId: number;
+  patientId: number;
+  doctorId: number;
+  doctorName: string;
+  specialtyName: string;
+  date: string;
+  timeSlot: string;
+  status: string;
+  reason?: string;
+  // Tính thật từ invoices.payment_status ở backend: 'unpaid' | 'partial' | 'paid'
+  paymentStatus?: string;
+  queueNumber: number;
+  clinicRoom: string;
+  fee: string;
+  isPackage?: boolean;
+  createdAt: string;
+}
+
 // ── Appointment APIs ──────────────────────────────────────────────────────────
 export const apiAppointment = {
   createAppointment: (data: {
@@ -238,23 +257,7 @@ export const apiAppointment = {
     }),
 
   getPatientAppointments: (patientId: number) =>
-    request<Array<{
-      appointmentId: number;
-      patientId: number;
-      doctorId: number;
-      doctorName: string;
-      specialtyName: string;
-      date: string;
-      timeSlot: string;
-      status: string;
-      // Tính thật từ invoices.payment_status ở backend: 'unpaid' | 'partial' | 'paid'
-      paymentStatus?: string;
-      queueNumber: number;
-      clinicRoom: string;
-      fee: string;
-      isPackage?: boolean;
-      createdAt: string;
-    }>>(`/appointments/patient/${patientId}`),
+    request<PatientAppointmentDto[]>(`/appointments/patient/${patientId}`),
 
   cancelAppointment: (id: number, cancelledBy?: string, cancelReason?: string) =>
     request<{ success: boolean; message: string }>(`/appointments/${id}/cancel`, {
@@ -321,7 +324,11 @@ export interface ProfileDto {
   name: string;
   patientId: string;
   relationship: string;
-  verificationStatus: 'pending' | 'verified' | 'rejected' | 'additional_info';
+  // Backend (AuthController/FamilyMembersController/PatientsController) chỉ từng set 'pending'
+  // hoặc 'verified' — không có action "reject" nào tồn tại. 'rejected' giữ trong type để khớp
+  // với AuthContext.VerificationStatus (phòng khi tính năng từ chối hồ sơ được thêm sau), nhưng
+  // hiện tại backend không bao giờ trả về giá trị này.
+  verificationStatus: 'pending' | 'verified' | 'rejected';
   isVerified?: boolean;
   verificationNote?: string;
   dob?: string;

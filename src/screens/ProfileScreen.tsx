@@ -8,7 +8,6 @@ import { useSettings } from '../context/SettingsContext';
 import DraggableChat from '../components/DraggableChat';
 
 const ProfileScreen = ({ navigation }: any) => {
-  // TODO [DATABASE]: Remove this mock state when real API is implemented.
   const { isVerified, setIsVerified, profiles, logout } = useAuth();
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();

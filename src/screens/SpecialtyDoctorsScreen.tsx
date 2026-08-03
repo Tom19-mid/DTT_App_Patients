@@ -10,6 +10,11 @@ const MOCK_SCHEDULE = [
   { dateLabel: 'Ngày mai, 26/07/2026', dateValue: '26/07/2026', slots: ['8:30 - 9:30', '9:30 - 10:30', '15:00 - 16:00'] }
 ];
 
+// yyyy-MM-dd cho API (khớp cách BookingScreen.tsx gọi apiMedical.getDoctorSchedules), và d/M/yyyy để
+// hiển thị + truyền cho ConfirmBooking — tách riêng 2 định dạng cho từng mục đích.
+const toApiDateStr = (d: Date) => `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+const toDisplayDateStr = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+
 const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
   const { specialty } = route.params || { specialty: { name: 'Chuyên khoa', id: undefined } };
   const [doctors, setDoctors] = useState<any[]>([]);
@@ -25,10 +30,25 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
       setLoading(true);
       const data = await apiMedical.getDoctors(specialty?.id);
       if (data && data.length > 0) {
+        // Trước đây giờ khám là BỊA (isShiftA = doctorId % 2 === 1) dù đã gọi API bác sĩ thật — bệnh
+        // nhân có thể đặt đúng giờ bác sĩ không hề làm việc. Lấy lịch trực THẬT cho hôm nay/ngày mai,
+        // theo đúng cách BookingScreen.tsx đã làm (apiMedical.getDoctorSchedules).
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+
+        const [schedulesToday, schedulesTomorrow] = await Promise.all([
+          apiMedical.getDoctorSchedules(undefined, specialty?.id, toApiDateStr(today)).catch(() => []),
+          apiMedical.getDoctorSchedules(undefined, specialty?.id, toApiDateStr(tomorrow)).catch(() => []),
+        ]);
+        const scheduleMap = new Map<number, { today?: any; tomorrow?: any }>();
+        (schedulesToday || []).forEach((s: any) => scheduleMap.set(s.doctorId, { ...scheduleMap.get(s.doctorId), today: s }));
+        (schedulesTomorrow || []).forEach((s: any) => scheduleMap.set(s.doctorId, { ...scheduleMap.get(s.doctorId), tomorrow: s }));
+
         const formatted = data.map((d: any) => {
-          const isShiftA = d.doctorId % 2 === 1;
-          const slotsToday = isShiftA ? ['07:30 - 08:30', '08:30 - 09:30', '09:30 - 10:30'] : ['13:30 - 14:30', '14:30 - 15:30', '15:30 - 16:30'];
-          const slotsTomorrow = isShiftA ? ['08:00 - 09:00', '10:30 - 11:30', '13:30 - 14:30'] : ['09:30 - 10:30', '14:30 - 15:30', '16:30 - 17:30'];
+          const sched = scheduleMap.get(d.doctorId);
+          const slotsToday = sched?.today?.isWorking ? sched.today.timeSlots : [];
+          const slotsTomorrow = sched?.tomorrow?.isWorking ? sched.tomorrow.timeSlots : [];
 
           return {
             id: d.doctorId,
@@ -38,8 +58,8 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
             reviews: d.reviewCount || 10,
             bio: `Bác sĩ ${d.fullName || ''} có ${d.experienceYears || 10} năm kinh nghiệm công tác tại ${d.clinicRoom || 'Phòng khám'}.\n• Lịch trực thường niên: ${d.workingDaysText || 'Thứ Hai đến Thứ Bảy'}.\n• Chuyên sâu khám và tư vấn điều trị các bệnh lý ${specialty.name || 'chuyên khoa'}.`,
             schedule: [
-              { dateLabel: 'Hôm nay, 25/07/2026', dateValue: '25/07/2026', slots: slotsToday },
-              { dateLabel: 'Ngày mai, 26/07/2026', dateValue: '26/07/2026', slots: slotsTomorrow }
+              { dateLabel: `Hôm nay, ${toDisplayDateStr(today)}`, dateValue: toDisplayDateStr(today), slots: slotsToday },
+              { dateLabel: `Ngày mai, ${toDisplayDateStr(tomorrow)}`, dateValue: toDisplayDateStr(tomorrow), slots: slotsTomorrow }
             ],
           };
         });
@@ -142,6 +162,9 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
                           <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
                           <Text style={styles.dateLabelText}>{day.dateLabel}</Text>
                         </View>
+                        {(!Array.isArray(day.slots) || day.slots.length === 0) && (
+                          <Text style={styles.bioText}>Bác sĩ không có lịch khám ngày này.</Text>
+                        )}
                         <View style={styles.slotsGrid}>
                           {Array.isArray(day.slots) && day.slots.map((time: string, idx: number) => (
                             <TouchableOpacity 
@@ -194,7 +217,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justify: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {

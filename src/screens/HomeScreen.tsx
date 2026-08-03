@@ -13,7 +13,15 @@ import { COLORS, SHADOWS } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
-import { prewarmCoreData } from '../services/apiService';
+import { prewarmCoreData, apiAppointment, apiHealthPackage, HealthPackage } from '../services/apiService';
+
+// Fallback images for packages without image_url in DB (mirrors PackagesScreen.tsx)
+const PACKAGE_FALLBACK_IMAGES: Record<number, string> = {
+  1: 'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?auto=format&fit=crop&w=300&q=80',
+  2: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=300&q=80',
+  3: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=300&q=80',
+  4: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
+};
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -42,13 +50,6 @@ const renderIcon = (item: { icon: string; type: string }, size = 36) => {
   return <MaterialCommunityIcons name={item.icon as any} size={size + 4} color={COLORS.primary} />;
 };
 
-const MOCK_PACKAGES = [
-  { id: 1, titleKey: 'pkg_basic_male', price: '1.200.000đ', booked: '1.2k+', image: 'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?auto=format&fit=crop&w=300&q=80' },
-  { id: 2, titleKey: 'pkg_basic_female', price: '1.450.000đ', booked: '2k+', image: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=300&q=80' },
-  { id: 3, titleKey: 'pkg_cancer_screen', price: '2.500.000đ', booked: '500+', image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=300&q=80' },
-  { id: 4, titleKey: 'pkg_heart', price: '1.800.000đ', booked: '800+', image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80' },
-];
-
 const RECENT_SERVICES = [
   { id: 1, name: 'BS. Nguyễn Văn A', detail: 'Nội tổng quát', time: 'Khám gần nhất: 15/05', icon: 'stethoscope', type: 'doctor' },
   { id: 2, name: 'Nhi khoa', detail: 'BS. Lê Thị B', time: 'Khám gần nhất: 21/07', icon: 'baby', type: 'specialty' },
@@ -65,9 +66,27 @@ const getShortName = (fullName?: string) => {
   return trimmed;
 };
 
+// Parse "dd/MM/yyyy" (định dạng backend trả về cho appointment.date) thành số ngày + thứ viết tắt,
+// dùng cho ô ngày trên card "Lịch hẹn sắp tới".
+const WEEKDAY_LABELS = ['CN', 'T.2', 'T.3', 'T.4', 'T.5', 'T.6', 'T.7'];
+const parseApptDateBox = (dateStr?: string): { day: string; weekday: string } => {
+  if (!dateStr) return { day: '--', weekday: '--' };
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return { day: '--', weekday: '--' };
+  const [d, m, y] = parts.map((p) => parseInt(p, 10));
+  const parsed = new Date(y, m - 1, d);
+  if (isNaN(parsed.getTime())) return { day: '--', weekday: '--' };
+  return { day: d.toString().padStart(2, '0'), weekday: WEEKDAY_LABELS[parsed.getDay()] };
+};
+
+// Lịch hẹn được coi là "sắp tới" nếu chưa hoàn tất/hủy/bỏ khám — khớp đúng bộ trạng thái backend trả
+// về (xem CalendarScreen.tsx dùng cùng quy ước).
+const FINISHED_APPT_STATUSES = ['Completed', 'Cancelled', 'NoShow'];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 const HomeScreen = ({ navigation }: any) => {
-  const HAS_APPOINTMENTS = false; // Toggle this to true to see the upcoming appointment card
+  const [upcomingAppt, setUpcomingAppt] = useState<any>(null);
+  const [packages, setPackages] = useState<HealthPackage[]>([]);
   const scrollViewRef = useRef<ScrollView>(null);
   const [selectedSpecialty, setSelectedSpecialty] = useState<typeof specialties[0] | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -85,6 +104,42 @@ const HomeScreen = ({ navigation }: any) => {
       prewarmCoreData(currentUser.patientId);
     }
   }, [currentUser?.patientId]);
+
+  // Card "Lịch hẹn sắp tới" trước đây bị khóa cứng luôn ẩn (HAS_APPOINTMENTS=false) bất kể có lịch
+  // hẹn thật hay không. Lấy lịch hẹn thật, chọn ca gần nhất chưa hoàn tất/hủy/bỏ khám.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!currentUser?.patientId) return;
+      try {
+        const list = await apiAppointment.getPatientAppointments(currentUser.patientId);
+        if (!mounted || !Array.isArray(list)) return;
+        const upcoming = list
+          .filter((a: any) => !FINISHED_APPT_STATUSES.includes(a.status))
+          .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        setUpcomingAppt(upcoming[0] || null);
+      } catch {
+        // Im lặng bỏ qua — card chỉ đơn giản không hiện nếu không tải được, không chặn màn Home.
+      }
+    })();
+    return () => { mounted = false; };
+  }, [currentUser?.patientId]);
+
+  // Danh sách gói khám nổi bật — trước đây khóa cứng 4 gói giả (MOCK_PACKAGES), có thể lệch hoàn
+  // toàn với dữ liệu thật trong PackagesScreen (giá/tên/ảnh sai, và bấm vào card không mở đúng gói
+  // vì packageId thật trong DB không nhất thiết trùng id 1-4 giả). Giờ lấy cùng nguồn API.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await apiHealthPackage.getAll();
+        if (mounted && Array.isArray(data)) setPackages(data);
+      } catch {
+        // Im lặng bỏ qua — mục gói khám chỉ đơn giản không hiện nếu không tải được.
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const handleMedicalRecordNavigation = (initialTab: string) => {
     if (isVerified) {
@@ -217,43 +272,56 @@ const HomeScreen = ({ navigation }: any) => {
         </TouchableOpacity>
 
         {/* ── Upcoming Appointment ── */}
-        {HAS_APPOINTMENTS && (
-          <View>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, isDarkMode && { color: '#F3F4F6' }]}>{t('upcoming_appointment')}</Text>
-            </View>
-            <TouchableOpacity 
-              style={[styles.appointmentCard, SHADOWS.card, isDarkMode && { backgroundColor: '#374151' }]} 
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('AppointmentDetail')}
-            >
-              <View style={[styles.appointmentDateBox, isDarkMode && { backgroundColor: '#4B5563', borderColor: '#4B5563' }]}>
-                <Text style={styles.appointmentDayNum}>26</Text>
-                <Text style={styles.appointmentDayText}>T.6</Text>
+        {upcomingAppt && (() => {
+          const dateBox = parseApptDateBox(upcomingAppt.date);
+          return (
+            <View>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, isDarkMode && { color: '#F3F4F6' }]}>{t('upcoming_appointment')}</Text>
               </View>
-              
-              <View style={styles.appointmentInfo}>
-                <Text style={[styles.appointmentSpecialty, isDarkMode && { color: '#F3F4F6' }]}>{t('general_internal')}</Text>
-                <View style={styles.appointmentDetailRow}>
-                  <Ionicons name="person-outline" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
-                  <Text style={[styles.appointmentDetailText, isDarkMode && { color: '#9CA3AF' }]}>{t('dr')} Nguyễn Văn A</Text>
+              <TouchableOpacity
+                style={[styles.appointmentCard, SHADOWS.card, isDarkMode && { backgroundColor: '#374151' }]}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('AppointmentDetail', {
+                  appointment: {
+                    ...upcomingAppt,
+                    doctor: upcomingAppt.doctorName,
+                    specialtyKey: upcomingAppt.specialtyName,
+                    time: upcomingAppt.timeSlot,
+                    displayDate: upcomingAppt.date,
+                    dateString: upcomingAppt.date,
+                    statusKey: upcomingAppt.status,
+                  },
+                })}
+              >
+                <View style={[styles.appointmentDateBox, isDarkMode && { backgroundColor: '#4B5563', borderColor: '#4B5563' }]}>
+                  <Text style={styles.appointmentDayNum}>{dateBox.day}</Text>
+                  <Text style={styles.appointmentDayText}>{dateBox.weekday}</Text>
                 </View>
-                <View style={styles.appointmentDetailRow}>
-                  <Ionicons name="time-outline" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
-                  <Text style={[styles.appointmentDetailText, isDarkMode && { color: '#9CA3AF' }]}>9:30 - 10:30</Text>
-                </View>
-              </View>
 
-              <View style={styles.appointmentStatusCol}>
-                <View style={styles.statusBadgeRow}>
-                  <View style={styles.statusDotGreen} />
-                  <Text style={styles.statusTextGreen}>{t('confirmed')}</Text>
+                <View style={styles.appointmentInfo}>
+                  <Text style={[styles.appointmentSpecialty, isDarkMode && { color: '#F3F4F6' }]}>{upcomingAppt.specialtyName || t('general_internal')}</Text>
+                  <View style={styles.appointmentDetailRow}>
+                    <Ionicons name="person-outline" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
+                    <Text style={[styles.appointmentDetailText, isDarkMode && { color: '#9CA3AF' }]}>{t('dr')} {upcomingAppt.doctorName || '—'}</Text>
+                  </View>
+                  <View style={styles.appointmentDetailRow}>
+                    <Ionicons name="time-outline" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
+                    <Text style={[styles.appointmentDetailText, isDarkMode && { color: '#9CA3AF' }]}>{upcomingAppt.timeSlot || '—'}</Text>
+                  </View>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={styles.appointmentChevron} />
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
+
+                <View style={styles.appointmentStatusCol}>
+                  <View style={styles.statusBadgeRow}>
+                    <View style={styles.statusDotGreen} />
+                    <Text style={styles.statusTextGreen}>{t('confirmed')}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={styles.appointmentChevron} />
+                </View>
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
 
         {/* ── Specialties: 4-column GRID (tap to open sheet) ── */}
         <View style={styles.gridContainer}>
@@ -331,17 +399,17 @@ const HomeScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packagesScroll}>
-            {MOCK_PACKAGES.map((pkg) => (
-              <TouchableOpacity key={pkg.id} style={[styles.packageCardWrapper, SHADOWS.card, isDarkMode && { backgroundColor: '#374151' }]} activeOpacity={0.9} onPress={() => navigation.navigate('Packages', { selectedId: pkg.id })}>
+            {packages.map((pkg) => (
+              <TouchableOpacity key={pkg.packageId} style={[styles.packageCardWrapper, SHADOWS.card, isDarkMode && { backgroundColor: '#374151' }]} activeOpacity={0.9} onPress={() => navigation.navigate('Packages', { selectedId: pkg.packageId })}>
                 <View style={[styles.packageCardInner, isDarkMode && { backgroundColor: '#374151' }]}>
-                  <Image source={{ uri: pkg.image }} style={styles.packageImage} />
+                  <Image source={{ uri: pkg.imageUrl || PACKAGE_FALLBACK_IMAGES[pkg.packageId] || PACKAGE_FALLBACK_IMAGES[1] }} style={styles.packageImage} />
                   <View style={styles.packageBadge}>
                     <Ionicons name="flame" size={10} color="#EF4444" />
-                    <Text style={styles.packageBadgeText}>{pkg.booked.replace('+', '')}+ {t('booked')}</Text>
+                    <Text style={styles.packageBadgeText}>{pkg.bookedCountFormatted} {t('booked')}</Text>
                   </View>
                   <View style={styles.packageInfo}>
-                    <Text style={[styles.packageTitle, isDarkMode && { color: '#F3F4F6' }]} numberOfLines={2}>{t(pkg.titleKey)}</Text>
-                    <Text style={styles.packagePrice}>{pkg.price}</Text>
+                    <Text style={[styles.packageTitle, isDarkMode && { color: '#F3F4F6' }]} numberOfLines={2}>{pkg.title}</Text>
+                    <Text style={styles.packagePrice}>{pkg.priceFormatted}</Text>
                   </View>
                 </View>
               </TouchableOpacity>

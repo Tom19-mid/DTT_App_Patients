@@ -6,7 +6,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import DraggableChat from '../components/DraggableChat';
 import { useSettings } from '../context/SettingsContext';
-import { apiAppointment, clearApiCache } from '../services/apiService';
+import { apiAppointment, clearApiCache, PatientAppointmentDto } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -18,49 +18,6 @@ const SPECIALTIES = [
   { nameKey: 'cardiology', icon: 'heartbeat' },
   { nameKey: 'neurology', icon: 'brain' },
   { nameKey: 'dermatology', icon: 'hand-sparkles' },
-];
-
-const MOCK_APPOINTMENTS = [
-  {
-    id: 1001,
-    dateString: '2026-07-26',
-    specialtyKey: 'general_internal',
-    doctor: 'BS. CKII Nguyễn Văn A',
-    time: '9:30 - 10:30',
-    statusKey: 'confirmed',
-    statusColor: '#22C55E',
-    isUpcoming: true,
-  },
-  {
-    id: 1002,
-    dateString: '2026-07-21',
-    specialtyKey: 'pediatrics',
-    doctor: 'BS. CKI Lê Thị B',
-    time: '14:00 - 15:00',
-    statusKey: 'completed',
-    statusColor: '#3B82F6',
-    isUpcoming: false,
-  },
-  {
-    id: 1003,
-    dateString: '2026-05-15',
-    specialtyKey: 'dermatology',
-    doctor: 'BS. CKI Phạm Thị D',
-    time: '08:30 - 09:30',
-    statusKey: 'completed',
-    statusColor: '#3B82F6',
-    isUpcoming: false,
-  },
-  {
-    id: 1004,
-    dateString: '2025-11-20',
-    specialtyKey: 'obstetrics',
-    doctor: 'TS. BS Đỗ Phương Hạnh',
-    time: '10:00 - 11:00',
-    statusKey: 'cancelled',
-    statusColor: '#EF4444',
-    isUpcoming: false,
-  },
 ];
 
 // --- Helper Functions for Calendar ---
@@ -94,7 +51,7 @@ const CalendarScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
   const { isDarkMode, t } = useSettings();
   const { currentUser } = useAuth();
-  const [apiAppointments, setApiAppointments] = useState<any[]>([]);
+  const [apiAppointments, setApiAppointments] = useState<PatientAppointmentDto[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
@@ -131,8 +88,10 @@ const CalendarScreen = ({ navigation }: any) => {
 
   const combinedAppointments = useMemo(() => {
     const formattedApi = apiAppointments.map(app => {
-      let specialty = app.specialtyName || app.specialtyKey;
-      let dateStr = app.date || app.createdAt || '26/07/2026';
+      let specialty = app.specialtyName;
+      const now = new Date();
+      const todayFallback = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+      let dateStr = app.date || app.createdAt || todayFallback;
       let timeStr = app.timeSlot || '08:30 - 09:30';
 
       // Parse specialty, date, and time directly from reason field to ensure full accuracy with SQL data
@@ -171,7 +130,7 @@ const CalendarScreen = ({ navigation }: any) => {
       }
 
       // Format dateString to YYYY-MM-DD for calendar compatibility
-      let formattedDateString = '2026-07-26';
+      let formattedDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       if (typeof dateStr === 'string' && dateStr.includes('/')) {
         const parts = dateStr.split('/');
         if (parts.length === 3) {
@@ -181,36 +140,37 @@ const CalendarScreen = ({ navigation }: any) => {
         formattedDateString = dateStr.substring(0, 10);
       }
 
-      // Handle status and tabs (PostgreSQL statusId: 1/2=Confirmed, 3=InProgress, 4=Completed, 5=Cancelled, 6=NoShow)
+      // Handle status and tabs — app.status là chuỗi PascalCase do backend trả (AppointmentResponseDto.Status),
+      // không có statusId riêng trên response này.
       let statusKey = 'confirmed';
       let statusColor = '#22C55E';
       let isUpcoming = true;
 
-      if (app.statusId === 5 || app.status === 'Cancelled' || app.status === 'cancelled') {
+      if (app.status === 'Cancelled' || app.status === 'cancelled') {
         statusKey = 'cancelled';
         statusColor = '#EF4444';
         isUpcoming = false;
-      } else if (app.statusId === 4 || app.status === 'Completed' || app.status === 'completed') {
+      } else if (app.status === 'Completed' || app.status === 'completed') {
         statusKey = 'completed';
         statusColor = '#3B82F6';
         isUpcoming = false;
-      } else if (app.statusId === 6 || app.status === 'NoShow' || app.status === 'noshow' || app.status === 'Expired' || app.status === 'expired' || app.status === 'Quá hạn') {
+      } else if (app.status === 'NoShow' || app.status === 'noshow' || app.status === 'Expired' || app.status === 'expired' || app.status === 'Quá hạn') {
         statusKey = 'noshow';
         statusColor = '#F97316';
         isUpcoming = false;
-      } else if (app.statusId === 3 || app.status === 'InProgress' || app.status === 'in_progress') {
+      } else if (app.status === 'InProgress' || app.status === 'in_progress') {
         statusKey = 'in_progress';
         statusColor = '#6366F1';
         isUpcoming = true;
-      } else if (app.statusId === 7 || app.status === 'CheckedIn' || app.status === 'checked_in') {
+      } else if (app.status === 'CheckedIn' || app.status === 'checked_in') {
         statusKey = 'checked_in';
         statusColor = '#10B981'; // Emerald green/cyan
         isUpcoming = true;
-      } else if (app.statusId === 8 || app.status === 'WaitingForDoctor' || app.status === 'waiting_for_doctor') {
+      } else if (app.status === 'WaitingForDoctor' || app.status === 'waiting_for_doctor') {
         statusKey = 'waiting_for_doctor';
         statusColor = '#8B5CF6'; // Purple violet
         isUpcoming = true;
-      } else if (app.statusId === 9 || app.status === 'AwaitingTestResults' || app.status === 'awaiting_test_results') {
+      } else if (app.status === 'AwaitingTestResults' || app.status === 'awaiting_test_results') {
         // Bác sĩ đã chỉ định Xét nghiệm/Siêu âm — bệnh nhân đang ở phòng CLS, chưa quay lại phòng khám
         statusKey = 'awaiting_test_results';
         statusColor = '#7C3AED'; // Deep violet
@@ -225,8 +185,7 @@ const CalendarScreen = ({ navigation }: any) => {
       }
 
       return {
-        id: app.appointmentId || app.id || Math.random(),
-        statusId: app.statusId,
+        id: app.appointmentId,
         status: app.status,
         dateString: formattedDateString,
         displayDate: displayDate,

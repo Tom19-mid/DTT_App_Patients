@@ -21,21 +21,19 @@ export interface PatientProfile {
   bhyt?: string;
 }
 
-const MOCK_PROFILES: PatientProfile[] = [
+// Placeholder trước khi đăng nhập — AppNavigator luôn khởi động ở màn Login (initialRouteName="Login"),
+// nên state này chỉ tồn tại trong khoảnh khắc trước khi login()/fetch profiles thật ghi đè, KHÔNG bao
+// giờ thực sự hiển thị cho người dùng thật. Cố tình để trống dữ liệu cá nhân thay vì số CCCD/BHYT giả
+// trông như thật để tránh nhầm là dữ liệu demo còn sót.
+const PLACEHOLDER_PROFILES: PatientProfile[] = [
   {
-    id: 'owner_2',
-    realId: 2,
+    id: 'placeholder_owner',
     isOwner: true,
-    name: 'ĐẶNG NGUYỄN',
-    patientId: '#000002',
+    name: '',
+    patientId: '',
     relationship: 'Bản thân',
-    verificationStatus: 'verified',
-    isVerified: true,
-    dob: '28/06/2000',
-    gender: 'Nam',
-    phone: '0909123456',
-    cccd: '079099123456',
-    bhyt: 'DN4797912345678'
+    verificationStatus: 'pending',
+    isVerified: false,
   }
 ];
 
@@ -82,13 +80,15 @@ interface AuthContextType {
   addRecentService: (item: Omit<RecentServiceItem, 'id' | 'time'> & { time?: string }) => void;
 }
 
+// Placeholder trước khi đăng nhập (xem PLACEHOLDER_PROFILES ở trên) — patientId=0 là sentinel
+// "không tồn tại" (cùng quy ước với login() bên dưới), KHÔNG dùng patientId thật nào để tránh
+// mọi đoạn code lỡ gọi API bằng currentUser này trước khi login() ghi đè vô tình trỏ vào dữ liệu
+// bệnh nhân thật.
 const defaultUser: User = {
-  patientId: 2,
-  fullName: 'Đặng Nguyễn',
-  phone: '0909123456',
-  email: 'dang@dtthealthcare.com',
-  avatarInitials: 'ĐN',
-  verificationStatus: 'verified',
+  patientId: 0,
+  fullName: '',
+  phone: '',
+  verificationStatus: 'pending',
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -96,7 +96,7 @@ const AuthContext = createContext<AuthContextType>({
   setCurrentUser: () => {},
   login: () => {},
   logout: async () => {},
-  isVerified: true,
+  isVerified: false,
   setIsVerified: () => {},
   profiles: [],
   addProfile: () => {},
@@ -108,8 +108,8 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User>(defaultUser);
-  const [isVerified, setIsVerified] = useState(true);
-  const [profiles, setProfiles] = useState<PatientProfile[]>(MOCK_PROFILES);
+  const [isVerified, setIsVerified] = useState(false);
+  const [profiles, setProfiles] = useState<PatientProfile[]>(PLACEHOLDER_PROFILES);
   const [recentServices, setRecentServices] = useState<RecentServiceItem[]>(INITIAL_RECENT_SERVICES);
 
   // Load patient profiles from backend DB whenever patientId changes
