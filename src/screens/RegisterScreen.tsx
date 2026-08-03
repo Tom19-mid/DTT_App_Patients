@@ -6,7 +6,6 @@ import CustomButton from '../components/CustomButton';
 import { COLORS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
 import { apiAuth } from '../services/apiService';
-import { saveTokenForBiometric } from '../services/biometricService';
 import { useCustomAlert } from '../context/AlertContext';
 
 const RegisterScreen = ({ navigation }: any) => {
@@ -86,8 +85,11 @@ const RegisterScreen = ({ navigation }: any) => {
 
     try {
       // Connect to ASP.NET Core Web API Backend
+      // KHÔNG kích hoạt Face ID ngay tại bước đăng ký — tài khoản chưa xác minh OTP/chưa từng đăng
+      // nhập bằng mật khẩu. Trước đây gọi ở đây khiến bất kỳ ai cầm điện thoại lúc đang chờ nhập OTP
+      // đều bấm Face ID ở màn Login là vào thẳng được tài khoản mới tạo, chưa xác minh, không cần biết
+      // mật khẩu. Face ID chỉ nên bật sau khi đăng nhập thật bằng mật khẩu (xem LoginScreen).
       const res = await apiAuth.register(trimmedName, trimmedPhone, trimmedEmail, password);
-      await saveTokenForBiometric(res.token, trimmedPhone);
 
       if (res.otpCode) {
         console.log('\n======================================================');

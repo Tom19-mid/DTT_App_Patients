@@ -59,6 +59,10 @@ const LoginScreen = ({ navigation }: any) => {
     const result = await loginWithBiometric();
 
     if (result.success) {
+      // Phải nạp đúng hồ sơ thật (patientId/fullName/...) vào AuthContext — trước đây bước này
+      // bị thiếu, khiến currentUser luôn ở giá trị mặc định hardcode (patientId: 2) sau khi đăng
+      // nhập Face ID, làm lộ/nhầm dữ liệu của bệnh nhân #2 cho bất kỳ ai đăng nhập bằng Face ID.
+      login(result.userData);
       showAlert({
         title: 'Thành công',
         message: 'Đăng nhập bằng Face ID thành công!',
@@ -113,7 +117,7 @@ const LoginScreen = ({ navigation }: any) => {
       // Try connecting to ASP.NET Core Web API Backend
       const res = await apiAuth.login(trimmedPhone, trimmedPass);
       login(res);
-      await saveTokenForBiometric(res.token, trimmedPhone);
+      await saveTokenForBiometric(res.token, trimmedPhone, res);
       setBiometricAvailable(true);
       navigation.replace('MainTabs');
     } catch (err: any) {

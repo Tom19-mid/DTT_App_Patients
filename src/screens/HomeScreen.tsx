@@ -451,7 +451,7 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
-      <DraggableChat />
+      <DraggableChat onPress={() => navigation.navigate('AIChat')} />
 
       {/* ── Specialty Bottom Sheet ── */}
       <SpecialtyBottomSheet

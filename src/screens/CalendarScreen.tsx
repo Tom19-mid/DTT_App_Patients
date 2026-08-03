@@ -237,6 +237,7 @@ const CalendarScreen = ({ navigation }: any) => {
         statusColor: statusColor,
         clinicRoom: isPkg ? '' : (app.clinicRoom || 'Phòng Khám Chuyên Khoa'),
         fee: app.fee || '250.000đ',
+        paymentStatus: app.paymentStatus || 'unpaid',
         isUpcoming: isUpcoming,
         isPackage: isPkg,
       };
@@ -671,7 +672,7 @@ const CalendarScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </Modal>
 
-      <DraggableChat />
+      <DraggableChat onPress={() => navigation.navigate('AIChat')} />
 
       {/* Floating Scroll to Top Button */}
       {showScrollTop && (

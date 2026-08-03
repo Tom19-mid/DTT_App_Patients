@@ -157,7 +157,7 @@ const OTPScreen = ({ navigation, route }: any) => {
         } else {
           // Register flow — OTP confirmed, go to login
           showAlert({
-            title: '✅ Xác minh thành công',
+            title: 'Xác minh thành công',
             message: 'Số điện thoại đã được xác minh. Bạn có thể đăng nhập ngay.',
             type: 'success',
             onConfirm: () => navigation.navigate('Login'),

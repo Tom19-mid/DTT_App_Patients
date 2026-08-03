@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
 import { apiNotifications, NotificationItem } from '../services/apiService';
+import DraggableChat from '../components/DraggableChat';
 
 const NotificationScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
@@ -187,6 +188,8 @@ const NotificationScreen = ({ navigation }: any) => {
           )}
         />
       )}
+
+      <DraggableChat onPress={() => navigation.navigate('AIChat')} />
     </SafeAreaView>
   );
 };

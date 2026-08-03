@@ -5,13 +5,14 @@ import { COLORS, SIZES, SHADOWS } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
+import DraggableChat from '../components/DraggableChat';
 
 const ProfileScreen = ({ navigation }: any) => {
   // TODO [DATABASE]: Remove this mock state when real API is implemented.
-  const { isVerified, setIsVerified, profiles } = useAuth();
+  const { isVerified, setIsVerified, profiles, logout } = useAuth();
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();
-  
+
   const primaryProfile = profiles.find(p => p.relationship === 'Bản thân') || profiles[0];
 
   const handleLogout = () => {
@@ -21,7 +22,8 @@ const ProfileScreen = ({ navigation }: any) => {
       type: "warning",
       showCancel: true,
       confirmText: "Đăng xuất",
-      onConfirm: () => {
+      onConfirm: async () => {
+        await logout();
         navigation.reset({
           index: 0,
           routes: [{ name: 'Login' }],
@@ -179,6 +181,8 @@ const ProfileScreen = ({ navigation }: any) => {
         <View style={{ height: 100 }} />
 
       </ScrollView>
+
+      <DraggableChat onPress={() => navigation.navigate('AIChat')} />
     </SafeAreaView>
   );
 };

@@ -487,7 +487,7 @@ const BookingScreen = ({ route, navigation }: any) => {
         </TouchableOpacity>
       </Modal>
 
-      <DraggableChat />
+      <DraggableChat onPress={() => navigation.navigate('AIChat')} />
     </SafeAreaView>
   );
 };

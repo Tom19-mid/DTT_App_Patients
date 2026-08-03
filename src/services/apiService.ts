@@ -40,7 +40,10 @@ export const clearApiCache = (keyPrefix?: string) => {
 };
 
 // ── Helper for HTTP requests with Cache, Retry, and Timeout ───────────────────
-async function request<T>(endpoint: string, options: RequestInit = {}, customTtl: number = DEFAULT_TTL): Promise<T> {
+// timeoutMs mặc định 8s cho hầu hết endpoint; endpoint nào gọi tới AI (Gemini có thể mất vài giây
+// + backend tự retry 1 lần khi rớt mạng) cần truyền timeoutMs dài hơn để không tự bỏ cuộc trước khi
+// backend kịp trả lời thật.
+async function request<T>(endpoint: string, options: RequestInit = {}, customTtl: number = DEFAULT_TTL, timeoutMs: number = 8000): Promise<T> {
   const isGet = !options.method || options.method.toUpperCase() === 'GET';
   const cacheKey = `${endpoint}_${JSON.stringify(options.body || '')}`;
 
@@ -70,7 +73,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
 
   while (attempt <= maxRetries) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second safety timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const response = await fetch(`${BASE_URL}${endpoint}`, {
@@ -80,10 +83,25 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
       });
 
       clearTimeout(timeoutId);
-      const data = await response.json();
+      // KHÔNG được gọi response.json() vô điều kiện — một số phản hồi lỗi (403 Forbidden do
+      // AccessControl chặn, hoặc trang lỗi HTML mặc định của ASP.NET khi debug) có body RỖNG hoặc
+      // không phải JSON, khiến response.json() ném lỗi parse JSON thay vì lỗi HTTP rõ ràng, làm mọi
+      // màn hình bắt lỗi hiển thị "SyntaxError: Unexpected end of JSON input" khó hiểu thay vì thông
+      // báo đúng nghĩa.
+      const rawText = await response.text();
+      let data: any = {};
+      if (rawText) {
+        try { data = JSON.parse(rawText); } catch { data = {}; }
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Đã xảy ra lỗi khi kết nối máy chủ');
+        const httpError: any = new Error(
+          data.message || (response.status === 403
+            ? 'Bạn không có quyền thực hiện thao tác này.'
+            : 'Đã xảy ra lỗi khi kết nối máy chủ')
+        );
+        httpError.status = response.status;
+        throw httpError;
       }
 
       // Save to cache for GET requests
@@ -105,10 +123,17 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
       attempt++;
 
       // If network fails but we have stale cache, gracefully fall back to stale cache!
-      if (attempt > maxRetries && isGet && DTTQueryCache.has(cacheKey)) {
+      // KHÔNG áp dụng cho lỗi 401/403 (hết hạn đăng nhập / không có quyền) — đó là phản hồi THẬT
+      // từ server, không phải lỗi mạng, nên trả lại stale cache sẽ che giấu việc phiên đã hết hạn
+      // (vd: sau khi đăng xuất, màn hình vẫn âm thầm hiện dữ liệu cũ như chưa hề đăng xuất).
+      const isAuthError = error?.status === 401 || error?.status === 403;
+      if (attempt > maxRetries && isGet && !isAuthError && DTTQueryCache.has(cacheKey)) {
         console.warn(`[Network Degraded] Serving fallback cache for ${endpoint}`);
         return DTTQueryCache.get(cacheKey)!.data as T;
       }
+
+      // 401/403 sẽ luôn thất bại lại y hệt khi retry với cùng token — dừng ngay thay vì thử lại vô ích.
+      if (isAuthError) break;
 
       if (attempt <= maxRetries && error.name !== 'AbortError') {
         const backoffDelay = Math.pow(2, attempt) * 300; // 600ms, 1200ms
@@ -222,6 +247,8 @@ export const apiAppointment = {
       date: string;
       timeSlot: string;
       status: string;
+      // Tính thật từ invoices.payment_status ở backend: 'unpaid' | 'partial' | 'paid'
+      paymentStatus?: string;
       queueNumber: number;
       clinicRoom: string;
       fee: string;
@@ -447,6 +474,69 @@ export const apiPatients = {
     } catch { }
     return { verified: false, verificationStatus: 'pending' as const };
   },
+};
+
+// ── AI Symptom Checker + Escalate to Staff APIs ───────────────────────────────
+// Xem Tai Lieu/ai_chatbot_luong_nghiep_vu.md — 1 session bắt đầu ở status 'AI'
+// (Gemini trả lời), có thể chuyển 'Escalated' (Lễ tân) rồi 'Closed'.
+
+export interface ChatMessageItem {
+  messageId: number;
+  senderType: 'Patient' | 'AI' | 'Staff';
+  senderUserId?: string | null;
+  // Chỉ có giá trị khi senderType='Staff' — tên thật của lễ tân đang tư vấn.
+  senderName?: string | null;
+  content: string;
+  createdAt: string;
+}
+
+export const apiChat = {
+  createSession: () =>
+    request<{ success: boolean; sessionId: number; status: string }>('/chat/sessions', {
+      method: 'POST',
+    }),
+
+  // Tìm phiên đang mở (AI/Escalated) gần nhất của bệnh nhân — gọi TRƯỚC createSession mỗi khi vào
+  // màn Chat, để tiếp tục phiên cũ thay vì luôn tạo mới (không thì phiên đang chờ Lễ tân trả lời sẽ
+  // bị "mồ côi" mỗi khi bệnh nhân thoát ra vào lại). customTtl=0 — không cache, luôn kiểm tra mới nhất.
+  getActiveSession: () =>
+    request<{ success: boolean; hasActive: boolean; sessionId?: number; status?: string }>(
+      '/chat/sessions/active',
+      {},
+      0
+    ),
+
+  // timeoutMs=28000 — khi status='AI', backend chờ Gemini trả lời (tự retry 1 lần nếu rớt mạng,
+  // mỗi lần tối đa ~12s) trước khi trả về; 8s mặc định của request() sẽ tự bỏ cuộc quá sớm và
+  // hiện lỗi "quá tải" ngay cả khi backend sắp trả lời thành công.
+  sendMessage: (sessionId: number, content: string) =>
+    request<{
+      success: boolean;
+      escalated?: boolean;
+      reply?: string;
+      suggestedSpecialtyId?: number | null;
+      suggestedSpecialtyName?: string | null;
+      shouldEscalate?: boolean;
+      // 'Closed' khi AI phát hiện bệnh nhân muốn kết thúc cuộc trò chuyện (vd: "kết thúc", "tạm biệt")
+      status?: string;
+    }>(`/chat/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }, DEFAULT_TTL, 28000),
+
+  // customTtl=0 — luôn lấy dữ liệu mới nhất khi polling, không dùng cache 60s mặc định
+  // (nếu không, bệnh nhân sẽ không thấy tin nhắn mới của Lễ tân trong tối đa 60 giây).
+  getMessages: (sessionId: number) =>
+    request<{ success: boolean; status: string; messages: ChatMessageItem[] }>(
+      `/chat/sessions/${sessionId}/messages`,
+      {},
+      0
+    ),
+
+  escalate: (sessionId: number) =>
+    request<{ success: boolean; status: string }>(`/chat/sessions/${sessionId}/escalate`, {
+      method: 'POST',
+    }),
 };
 
 // ── Stage 2 Optimization: Intelligent Pre-Warming Engine ──────────────────────

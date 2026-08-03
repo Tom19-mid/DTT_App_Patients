@@ -5,7 +5,7 @@ import { COLORS, SHADOWS } from '../constants/theme';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
-import { BASE_URL } from '../services/apiService';
+import { apiAuth } from '../services/apiService';
 
 const ChangePasswordScreen = ({ navigation }: any) => {
   const { showAlert } = useCustomAlert();
@@ -37,17 +37,8 @@ const ChangePasswordScreen = ({ navigation }: any) => {
 
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/auth/change-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: currentUser.phone,
-          currentPassword: oldPassword,
-          newPassword: newPassword,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await apiAuth.changePassword(currentUser.phone, oldPassword, newPassword);
+      if (data.success) {
         showAlert({
           title: '🔒 Đổi mật khẩu thành công',
           message: 'Mật khẩu của bạn đã được cập nhật an toàn.',
@@ -57,8 +48,8 @@ const ChangePasswordScreen = ({ navigation }: any) => {
       } else {
         showAlert({ title: 'Không thể đổi mật khẩu', message: data.message || 'Mật khẩu hiện tại không chính xác.', type: 'error' });
       }
-    } catch {
-      showAlert({ title: 'Lỗi kết nối', message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại.', type: 'error' });
+    } catch (err: any) {
+      showAlert({ title: 'Không thể đổi mật khẩu', message: err.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.', type: 'error' });
     } finally {
       setLoading(false);
     }

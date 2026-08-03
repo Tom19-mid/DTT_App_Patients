@@ -225,7 +225,20 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
           <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>Trạng thái thanh toán</Text>
-            <Text style={[styles.infoValue, { color: '#10B981', fontWeight: 'bold' }]}>🟢 Đã thanh toán tại Quầy Bệnh viện</Text>
+            {(() => {
+              // Đọc đúng invoices.payment_status thật từ backend — trước đây in cứng "Đã thanh toán"
+              // bất kể trạng thái thật, khiến bệnh nhân tưởng lễ tân đã xác nhận dù chưa hề thu tiền.
+              // Giá trị thật chỉ có 'unpaid' | 'partial' | 'paid' (đúng theo DB constraint
+              // chk_payment_status — không có 'pending').
+              const ps = safeApp.paymentStatus;
+              if (ps === 'paid') {
+                return <Text style={[styles.infoValue, { color: '#10B981', fontWeight: 'bold' }]}>🟢 Đã thanh toán tại Quầy Bệnh viện</Text>;
+              }
+              if (ps === 'partial') {
+                return <Text style={[styles.infoValue, { color: '#F59E0B', fontWeight: 'bold' }]}>🟡 Đã thanh toán một phần</Text>;
+              }
+              return <Text style={[styles.infoValue, { color: '#EF4444', fontWeight: 'bold' }]}>🔴 Chưa thanh toán</Text>;
+            })()}
           </View>
         </View>
 

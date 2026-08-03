@@ -12,7 +12,11 @@ const DROP_ZONE_Y   = height - 180;
 const DROP_ZONE_X   = width / 2;
 const DROP_RADIUS   = 70; // px — how close to trigger "near" state
 
-const DraggableChat = () => {
+interface DraggableChatProps {
+  onPress?: () => void;
+}
+
+const DraggableChat = ({ onPress }: DraggableChatProps) => {
   const [visible, setVisible]     = useState(true);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -30,6 +34,10 @@ const DraggableChat = () => {
 
   const panResponder = useRef(
     PanResponder.create({
+      // onStartShouldSetPanResponder cũng phải trả true — nếu chỉ có onMoveShouldSetPanResponder,
+      // một cú chạm không hề di chuyển (tap thuần) sẽ không kích hoạt responder nên
+      // onPanResponderRelease (nơi phát hiện tap để gọi onPress) sẽ không bao giờ chạy.
+      onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
 
       onPanResponderGrant: () => {
@@ -56,7 +64,7 @@ const DraggableChat = () => {
         animateXScale(dist < DROP_RADIUS ? 1.5 : 1);
       },
 
-      onPanResponderRelease: (e) => {
+      onPanResponderRelease: (e, gesture) => {
         pan.flattenOffset();
         setIsDragging(false);
         animateXScale(1);
@@ -69,6 +77,13 @@ const DraggableChat = () => {
 
         if (dist < DROP_RADIUS) {
           setVisible(false);
+          return;
+        }
+
+        // Gần như không di chuyển → coi là tap (mở màn hình Chat AI) thay vì kéo-thả.
+        const moved = Math.sqrt(gesture.dx * gesture.dx + gesture.dy * gesture.dy);
+        if (moved < 6) {
+          onPress?.();
         }
       },
     })

@@ -1,18 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
-import { BASE_URL } from '../services/apiService';
+import { apiAuth } from '../services/apiService';
+import { isBiometricEnabled, clearBiometricToken } from '../services/biometricService';
 
 const AccountSettingsScreen = ({ navigation }: any) => {
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();
   const { currentUser, setCurrentUser } = useAuth();
-  const [biometricsEnabled, setBiometricsEnabled] = useState(true);
+  // Trước đây công tắc này chỉ là useState local, không đọc/ghi trạng thái Face ID thật —
+  // bật/tắt ở đây không có tác dụng gì, Face ID vẫn hoạt động bình thường dù người dùng đã "tắt".
+  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    isBiometricEnabled().then(setBiometricsEnabled);
+  }, []);
+
+  const handleToggleBiometrics = async (value: boolean) => {
+    if (!value) {
+      await clearBiometricToken();
+      setBiometricsEnabled(false);
+    } else {
+      // Không có sẵn mật khẩu ở màn này để thiết lập lại token Face ID — hướng dẫn đăng nhập lại
+      // bằng mật khẩu thay vì âm thầm bật công tắc mà không thực sự kích hoạt được gì.
+      showAlert({
+        title: 'Kích hoạt Face ID',
+        message: 'Vui lòng đăng xuất và đăng nhập lại bằng mật khẩu một lần để kích hoạt đăng nhập Face ID.',
+        type: 'info',
+      });
+    }
+  };
 
   // Bind real user data from AuthContext
   const [fullName, setFullName] = useState(currentUser.fullName || '');
@@ -25,20 +47,15 @@ const AccountSettingsScreen = ({ navigation }: any) => {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/auth/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientId: currentUser.patientId,
-          fullName: fullName.trim(),
-          email: email.trim(),
-        }),
+      const data = await apiAuth.updateProfile({
+        patientId: currentUser.patientId,
+        fullName: fullName.trim(),
+        email: email.trim(),
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data.success) {
         setCurrentUser(prev => ({ ...prev, fullName: fullName.trim(), email: email.trim() }));
         showAlert({
-          title: '✅ Cập nhật thành công',
+          title: 'Cập nhật thành công',
           message: 'Thông tin hồ sơ của bạn đã được lưu.',
           type: 'success',
           onConfirm: () => navigation.goBack()
@@ -46,8 +63,8 @@ const AccountSettingsScreen = ({ navigation }: any) => {
       } else {
         showAlert({ title: 'Lỗi', message: data.message || 'Không thể cập nhật thông tin.', type: 'error' });
       }
-    } catch {
-      showAlert({ title: 'Lỗi kết nối', message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại.', type: 'error' });
+    } catch (err: any) {
+      showAlert({ title: 'Lỗi kết nối', message: err.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -122,7 +139,7 @@ const AccountSettingsScreen = ({ navigation }: any) => {
         </View>
 
         <View style={[styles.divider, isDarkMode && { backgroundColor: '#374151' }]} />
-        
+
         <Text style={[styles.sectionTitle, isDarkMode && { color: '#D1D5DB' }]}>{t('security')}</Text>
 
         <View style={[styles.settingRow, SHADOWS.card, isDarkMode && { backgroundColor: '#374151' }]}>
@@ -136,8 +153,8 @@ const AccountSettingsScreen = ({ navigation }: any) => {
             </View>
           </View>
           <Switch
-            value={biometricsEnabled} 
-            onValueChange={setBiometricsEnabled} 
+            value={biometricsEnabled}
+            onValueChange={handleToggleBiometrics}
             trackColor={{ false: isDarkMode ? '#4B5563' : '#D1D5DB', true: isDarkMode ? '#60A5FA' : COLORS.primary }}
           />
         </View>

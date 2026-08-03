@@ -22,12 +22,19 @@ import * as SecureStore from 'expo-secure-store';
 const TOKEN_KEY = 'dtt_user_token';
 const PHONE_KEY = 'dtt_user_phone';
 const BIOMETRIC_ENABLED_KEY = 'dtt_biometric_enabled';
+// Hồ sơ đầy đủ (patientId/fullName/email/verificationStatus...) trả về lúc đăng nhập bằng
+// mật khẩu — lưu lại để khôi phục đúng AuthContext.currentUser khi đăng nhập lại bằng Face ID,
+// KHÔNG được để currentUser rơi về giá trị mặc định hardcode (patientId: 2) như trước đây.
+const USER_DATA_KEY = 'dtt_user_data';
 
 // ─── Save token after successful password login ────────────────────────────────
-export const saveTokenForBiometric = async (token: string, phone: string): Promise<void> => {
+export const saveTokenForBiometric = async (token: string, phone: string, userData?: any): Promise<void> => {
   await SecureStore.setItemAsync(TOKEN_KEY, token);
   await SecureStore.setItemAsync(PHONE_KEY, phone);
   await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, 'true');
+  if (userData) {
+    await SecureStore.setItemAsync(USER_DATA_KEY, JSON.stringify(userData));
+  }
 };
 
 // ─── Check if biometric login is set up ───────────────────────────────────────
@@ -41,6 +48,7 @@ export const clearBiometricToken = async (): Promise<void> => {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
   await SecureStore.deleteItemAsync(PHONE_KEY);
   await SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY);
+  await SecureStore.deleteItemAsync(USER_DATA_KEY);
 };
 
 // ─── Check device hardware support ────────────────────────────────────────────
@@ -59,7 +67,7 @@ export const checkBiometricCapability = async (): Promise<BiometricCapability> =
 
 // ─── Main: Authenticate with biometrics and return token ─────────────────────
 export type BiometricLoginResult =
-  | { success: true; token: string; phone: string }
+  | { success: true; token: string; phone: string; userData: any }
   | { success: false; reason: 'no_hardware' | 'not_enrolled' | 'not_setup' | 'auth_failed' | 'cancelled' };
 
 export const loginWithBiometric = async (): Promise<BiometricLoginResult> => {
@@ -92,17 +100,21 @@ export const loginWithBiometric = async (): Promise<BiometricLoginResult> => {
     return { success: false, reason };
   }
 
-  // 4. Biometric approved — retrieve the saved token
+  // 4. Biometric approved — retrieve the saved token + hồ sơ đầy đủ từ lần đăng nhập mật khẩu gần nhất
   const token = await SecureStore.getItemAsync(TOKEN_KEY);
   const phone = await SecureStore.getItemAsync(PHONE_KEY);
+  const userDataRaw = await SecureStore.getItemAsync(USER_DATA_KEY);
 
-  if (!token || !phone) {
+  if (!token || !phone || !userDataRaw) {
     return { success: false, reason: 'not_setup' };
   }
 
-  // TODO: (After backend integration) Validate token with .NET API:
-  //   const response = await axios.post('/api/auth/refresh', { token });
-  //   if (!response.data.valid) return { success: false, reason: 'auth_failed' };
+  let userData: any;
+  try {
+    userData = JSON.parse(userDataRaw);
+  } catch {
+    return { success: false, reason: 'not_setup' };
+  }
 
-  return { success: true, token, phone };
+  return { success: true, token, phone, userData };
 };

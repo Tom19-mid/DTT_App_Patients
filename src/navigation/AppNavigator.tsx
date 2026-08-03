@@ -33,6 +33,7 @@ import SupportScreen from '../screens/SupportScreen';
 import GeneralSettingsScreen from '../screens/GeneralSettingsScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import QRScannerScreen from '../screens/QRScannerScreen';
+import AIChatScreen from '../screens/AIChatScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -144,6 +145,7 @@ const AppNavigator = () => {
         <Stack.Screen name="GeneralSettings" component={GeneralSettingsScreen} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+        <Stack.Screen name="AIChat" component={AIChatScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
       </Stack.Navigator>
     </NavigationContainer>

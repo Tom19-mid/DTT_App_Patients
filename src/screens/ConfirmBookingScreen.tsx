@@ -66,13 +66,14 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
       setSuccessModalVisible(true);
     } catch (error: any) {
       console.log('Error creating appointment:', error);
-      // Fallback
-      setBookingResult({
-        queueNumber: 1,
-        date: date || '25/07/2026',
-        timeSlot: time || '08:30 - 09:30'
+      // KHÔNG được hiện modal "Đặt lịch thành công" giả khi request thực sự thất bại (vd: lỗi mạng,
+      // 403 do phiên đăng nhập có vấn đề) — trước đây luôn hiện thành công với queueNumber giả, khiến
+      // bệnh nhân tưởng đã có lịch hẹn trong khi thực tế chưa được đặt.
+      showAlert({
+        title: 'Đặt lịch thất bại',
+        message: error?.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.',
+        type: 'error',
       });
-      setSuccessModalVisible(true);
     } finally {
       setLoading(false);
     }

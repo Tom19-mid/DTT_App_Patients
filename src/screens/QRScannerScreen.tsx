@@ -131,9 +131,11 @@ const QRScannerScreen = ({ navigation, route }: any) => {
       });
       setProcessing(false);
       if (res && res.success) {
+        // Hồ sơ liên kết qua QR giờ ở trạng thái "pending" (chờ Lễ Tân đối chiếu CCCD thực tế),
+        // KHÔNG còn tự động "đã xác thực" như trước — tiêu đề/nội dung không được ngụ ý đã xong.
         Alert.alert(
-          '✅ Liên kết thành công!',
-          res.message || `Hồ sơ bệnh nhân #${patientId} đã được liên kết với tài khoản của bạn và đồng bộ y tế.`,
+          '✅ Đã liên kết hồ sơ',
+          res.message || `Hồ sơ bệnh nhân #${patientId} đã được liên kết — vui lòng mang CCCD ra quầy Lễ Tân để hoàn tất xác thực.`,
           [
             {
               text: 'Xem hồ sơ',
@@ -148,7 +150,9 @@ const QRScannerScreen = ({ navigation, route }: any) => {
       }
     } catch (e: any) {
       setProcessing(false);
-      Alert.alert('Lỗi kết nối', 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.', [
+      // Hiện đúng thông báo lỗi thật từ server (vd validate QR sai, không có quyền...) thay vì luôn
+      // báo chung chung "lỗi kết nối" — apiService.ts đã đưa message thật của server vào e.message.
+      Alert.alert('Không thể liên kết hồ sơ', e?.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.', [
         { text: 'Đóng', onPress: () => { setScanned(false); } }
       ]);
     }

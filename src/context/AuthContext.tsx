@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { apiFamilyMembers } from '../services/apiService';
+import { apiFamilyMembers, clearApiCache } from '../services/apiService';
+import { clearBiometricToken } from '../services/biometricService';
 
 export type VerificationStatus = 'pending' | 'verified' | 'rejected';
 
@@ -70,7 +71,7 @@ interface AuthContextType {
   currentUser: User;
   setCurrentUser: React.Dispatch<React.SetStateAction<User>>;
   login: (userData: any) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   isVerified: boolean;
   setIsVerified: (value: boolean) => void;
   profiles: PatientProfile[];
@@ -94,7 +95,7 @@ const AuthContext = createContext<AuthContextType>({
   currentUser: defaultUser,
   setCurrentUser: () => {},
   login: () => {},
-  logout: () => {},
+  logout: async () => {},
   isVerified: true,
   setIsVerified: () => {},
   profiles: [],
@@ -157,7 +158,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const loggedUser: User = {
       token: userData.token,
       userId: userData.userId,
-      patientId: typeof userData.patientId === 'number' ? userData.patientId : 2,
+      // KHÔNG được fallback về một patientId THẬT (id=2) khi response bất thường — trước đây làm vậy
+      // khiến mọi tài khoản gặp lỗi này vô tình dùng chung dữ liệu của bệnh nhân #2. Dùng 0 (không tồn
+      // tại) để mọi endpoint theo patientId thất bại rõ ràng thay vì âm thầm trỏ nhầm sang người khác.
+      patientId: typeof userData.patientId === 'number' ? userData.patientId : 0,
       fullName: name,
       phone: userData.phone || '0909123456',
       email: userData.email || 'user@dtthealthcare.com',
@@ -169,7 +173,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsVerified(loggedUser.verificationStatus === 'verified');
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await clearBiometricToken();
+    clearApiCache();
     setCurrentUser(defaultUser);
   };
 
