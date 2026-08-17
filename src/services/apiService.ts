@@ -29,6 +29,31 @@ interface CacheItem<T> {
 const DTTQueryCache = new Map<string, CacheItem<any>>();
 const DEFAULT_TTL = 60 * 1000; // 60 seconds standard cache TTL for GET queries
 
+// Trước đây DTTQueryCache không giới hạn dung lượng — mỗi endpoint có tham số động (vd:
+// getDoctorSchedules(doctorId, specialtyId, dateStr) duyệt qua nhiều bác sĩ/ngày) tạo ra 1 cacheKey
+// riêng và tồn tại vĩnh viễn, phiên dùng app càng lâu càng tích tụ bộ nhớ. Giới hạn kiểu LRU đơn giản
+// (Map giữ thứ tự chèn trong JS — xoá bớt entry cũ nhất khi vượt giới hạn, "chạm" lại entry khi đọc
+// trúng cache để đẩy nó về cuối, giữ những gì đang dùng thường xuyên).
+const MAX_CACHE_ENTRIES = 150;
+function cacheGet(key: string): CacheItem<any> | undefined {
+  const item = DTTQueryCache.get(key);
+  if (item) {
+    // Move-to-end (LRU touch)
+    DTTQueryCache.delete(key);
+    DTTQueryCache.set(key, item);
+  }
+  return item;
+}
+function cacheSet(key: string, item: CacheItem<any>) {
+  DTTQueryCache.delete(key);
+  DTTQueryCache.set(key, item);
+  while (DTTQueryCache.size > MAX_CACHE_ENTRIES) {
+    const oldestKey = DTTQueryCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    DTTQueryCache.delete(oldestKey);
+  }
+}
+
 export const clearApiCache = (keyPrefix?: string) => {
   if (!keyPrefix) {
     DTTQueryCache.clear();
@@ -49,7 +74,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
 
   // 1. Instant Cache Retrieval (Stale-While-Revalidate 0ms latency)
   if (isGet && DTTQueryCache.has(cacheKey)) {
-    const cached = DTTQueryCache.get(cacheKey)!;
+    const cached = cacheGet(cacheKey)!;
     const now = Date.now();
     if (now - cached.timestamp < cached.ttl) {
       // Return cached result instantly at 0ms latency
@@ -106,7 +131,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
 
       // Save to cache for GET requests
       if (isGet) {
-        DTTQueryCache.set(cacheKey, { data, timestamp: Date.now(), ttl: customTtl });
+        cacheSet(cacheKey, { data, timestamp: Date.now(), ttl: customTtl });
       } else {
         // Automatically invalidate cache for affected domains on POST/PUT/DELETE
         if (endpoint.includes('/appointments')) clearApiCache('/appointments');
@@ -129,7 +154,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
       const isAuthError = error?.status === 401 || error?.status === 403;
       if (attempt > maxRetries && isGet && !isAuthError && DTTQueryCache.has(cacheKey)) {
         console.warn(`[Network Degraded] Serving fallback cache for ${endpoint}`);
-        return DTTQueryCache.get(cacheKey)!.data as T;
+        return cacheGet(cacheKey)!.data as T;
       }
 
       // 401/403 sẽ luôn thất bại lại y hệt khi retry với cùng token — dừng ngay thay vì thử lại vô ích.
