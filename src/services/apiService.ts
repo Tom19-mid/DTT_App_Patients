@@ -180,6 +180,24 @@ export const apiAuth = {
       method: 'POST',
       body: JSON.stringify({ phone, currentPassword, newPassword }),
     }),
+
+  sendOtp: (phone: string) =>
+    request<{ success: boolean; message: string; otpCode?: string }>('/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    }),
+
+  verifyOtp: (phone: string, otpCode: string) =>
+    request<{ success: boolean; message: string }>('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone, otpCode }),
+    }),
+
+  resetPassword: (phone: string, otpCode: string, newPassword: string) =>
+    request<{ success: boolean; message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ phone, otpCode, newPassword }),
+    }),
 };
 
 // ── Medical Data APIs ─────────────────────────────────────────────────────────
