@@ -205,6 +205,13 @@ const CalendarScreen = ({ navigation }: any) => {
     return formattedApi;
   }, [apiAppointments]);
 
+  // Trước đây filter này chạy lại bên trong 1 IIFE ngay trong JSX mỗi lần render (kể cả khi
+  // combinedAppointments/activeTab không đổi, vd: đóng/mở modal khác trên cùng màn hình) — đưa ra
+  // useMemo để chỉ tính lại khi 1 trong 2 giá trị phụ thuộc thực sự thay đổi.
+  const filteredAppointments = useMemo(() => {
+    return combinedAppointments.filter(app => activeTab === 'upcoming' ? app.isUpcoming : !app.isUpcoming);
+  }, [combinedAppointments, activeTab]);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -494,13 +501,6 @@ const CalendarScreen = ({ navigation }: any) => {
 
             {/* Filtered Appointments */}
             {(() => {
-              const filteredAppointments = combinedAppointments.filter(app => {
-                if (activeTab === 'upcoming') {
-                  return app.isUpcoming;
-                }
-                return !app.isUpcoming;
-              });
-
               if (filteredAppointments.length === 0) {
                 return (
                   <View style={styles.emptyStateContainer}>

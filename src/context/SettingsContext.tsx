@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo } from 'react';
 
 type Language = 'vi' | 'en';
 
@@ -385,12 +385,20 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [language, setLanguage] = useState<Language>('vi');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const t = (key: string) => {
+  const t = useCallback((key: string) => {
     return (translations[language] as any)[key] || key;
-  };
+  }, [language]);
+
+  // Memo hoá value — trước đây object literal (kèm hàm t mới) tạo lại mỗi lần render, khiến mọi
+  // component đọc useSettings() (rất nhiều màn hình dùng để check isDarkMode/dịch text) re-render
+  // theo bất kỳ thay đổi nào của context này.
+  const value = useMemo<SettingsContextType>(
+    () => ({ language, setLanguage, isDarkMode, setIsDarkMode, t }),
+    [language, isDarkMode, t]
+  );
 
   return (
-    <SettingsContext.Provider value={{ language, setLanguage, isDarkMode, setIsDarkMode, t }}>
+    <SettingsContext.Provider value={value}>
       {children}
     </SettingsContext.Provider>
   );

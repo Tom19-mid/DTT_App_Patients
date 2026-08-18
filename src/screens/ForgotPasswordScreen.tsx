@@ -8,7 +8,7 @@ import { COLORS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { Ionicons } from '@expo/vector-icons';
-import { BASE_URL } from '../services/apiService';
+import { apiAuth } from '../services/apiService';
 
 const ForgotPasswordScreen = ({ navigation }: any) => {
   const { isDarkMode, t } = useSettings();
@@ -32,14 +32,9 @@ const ForgotPasswordScreen = ({ navigation }: any) => {
 
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: trimmed }),
-      });
-      const data = await res.json();
+      const data = await apiAuth.sendOtp(trimmed);
 
-      if (res.ok && data.success) {
+      if (data.success) {
         console.log('\n======================================================');
         console.log(`🔑 [DEMO ĐỒ ÁN TỐT NGHIỆP] MÃ OTP QUÊN MẬT KHẨU: ${data.otpCode}`);
         console.log('======================================================\n');
@@ -56,8 +51,8 @@ const ForgotPasswordScreen = ({ navigation }: any) => {
           type: 'error',
         });
       }
-    } catch {
-      showAlert({ title: 'Lỗi kết nối', message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại.', type: 'error' });
+    } catch (err: any) {
+      showAlert({ title: 'Không thể gửi mã OTP', message: err?.message || 'Số điện thoại chưa được đăng ký trong hệ thống.', type: 'error' });
     } finally {
       setLoading(false);
     }

@@ -8,7 +8,7 @@ import { COLORS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { Ionicons } from '@expo/vector-icons';
-import { BASE_URL } from '../services/apiService';
+import { apiAuth } from '../services/apiService';
 
 /**
  * OTPScreen — Dùng cho 2 luồng:
@@ -102,13 +102,8 @@ const OTPScreen = ({ navigation, route }: any) => {
     if (!canResend) return;
     setResending(true);
     try {
-      const res = await fetch(`${BASE_URL}/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await apiAuth.sendOtp(phone);
+      if (data.success) {
         if (data.otpCode) {
           setCurrentOtp(data.otpCode);
           console.log('\n======================================================');
@@ -126,8 +121,8 @@ const OTPScreen = ({ navigation, route }: any) => {
       } else {
         showAlert({ title: 'Lỗi', message: data.message || 'Không thể gửi lại mã OTP.', type: 'error' });
       }
-    } catch {
-      showAlert({ title: 'Lỗi kết nối', message: 'Không thể kết nối đến máy chủ.', type: 'error' });
+    } catch (err: any) {
+      showAlert({ title: 'Lỗi kết nối', message: err?.message || 'Không thể kết nối đến máy chủ.', type: 'error' });
     } finally {
       setResending(false);
     }
@@ -143,14 +138,9 @@ const OTPScreen = ({ navigation, route }: any) => {
 
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otpCode: code }),
-      });
-      const data = await res.json();
+      const data = await apiAuth.verifyOtp(phone, code);
 
-      if (res.ok && data.success) {
+      if (data.success) {
         if (purpose === 'reset_password') {
           // Show new password form
           setOtpVerified(true);
@@ -166,8 +156,8 @@ const OTPScreen = ({ navigation, route }: any) => {
       } else {
         showAlert({ title: 'Mã OTP không hợp lệ', message: data.message || 'Mã OTP không chính xác hoặc đã hết hạn.', type: 'error' });
       }
-    } catch {
-      showAlert({ title: 'Lỗi kết nối', message: 'Không thể kết nối đến máy chủ.', type: 'error' });
+    } catch (err: any) {
+      showAlert({ title: 'Mã OTP không hợp lệ', message: err?.message || 'Mã OTP không chính xác hoặc đã hết hạn.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -190,14 +180,9 @@ const OTPScreen = ({ navigation, route }: any) => {
 
     setSavingPassword(true);
     try {
-      const res = await fetch(`${BASE_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otpCode: otp.join(''), newPassword }),
-      });
-      const data = await res.json();
+      const data = await apiAuth.resetPassword(phone, otp.join(''), newPassword);
 
-      if (res.ok && data.success) {
+      if (data.success) {
         showAlert({
           title: '🔒 Đặt lại mật khẩu thành công',
           message: 'Mật khẩu của bạn đã được cập nhật. Vui lòng đăng nhập với mật khẩu mới.',
@@ -207,8 +192,8 @@ const OTPScreen = ({ navigation, route }: any) => {
       } else {
         showAlert({ title: 'Lỗi', message: data.message || 'Không thể đặt lại mật khẩu.', type: 'error' });
       }
-    } catch {
-      showAlert({ title: 'Lỗi kết nối', message: 'Không thể kết nối đến máy chủ.', type: 'error' });
+    } catch (err: any) {
+      showAlert({ title: 'Lỗi', message: err?.message || 'Không thể đặt lại mật khẩu.', type: 'error' });
     } finally {
       setSavingPassword(false);
     }

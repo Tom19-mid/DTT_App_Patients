@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import { apiFamilyMembers, clearApiCache } from '../services/apiService';
 import { clearBiometricToken } from '../services/biometricService';
 
@@ -145,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => { isMounted = false; };
   }, [currentUser.patientId]);
 
-  const login = (userData: any) => {
+  const login = useCallback((userData: any) => {
     const name = userData.fullName || 'Người Dùng';
     const parts = name.trim().split(' ');
     let initials = 'U';
@@ -171,13 +171,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setCurrentUser(loggedUser);
     setIsVerified(loggedUser.verificationStatus === 'verified');
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await clearBiometricToken();
     clearApiCache();
     setCurrentUser(defaultUser);
-  };
+  }, []);
 
   // Keep primary profile ("Bản thân") synced with currentUser state if offline
   useEffect(() => {
@@ -191,7 +191,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } : p));
   }, [isVerified, currentUser]);
 
-  const addProfile = async (data: Omit<PatientProfile, 'id' | 'patientId' | 'verificationStatus' | 'isVerified'>) => {
+  const addProfile = useCallback(async (data: Omit<PatientProfile, 'id' | 'patientId' | 'verificationStatus' | 'isVerified'>) => {
     const tempId = Math.random().toString(36).substring(7);
     const newProfile: PatientProfile = {
       ...data,
@@ -233,9 +233,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.log('[AuthContext] Failed to save profile to DB:', e);
     }
-  };
+  }, [currentUser.patientId]);
 
-  const updateProfile = async (id: string, updates: Partial<PatientProfile>) => {
+  const updateProfile = useCallback(async (id: string, updates: Partial<PatientProfile>) => {
     const target = profiles.find(p => p.id === id);
     setProfiles(prev => prev.map(p => {
       if (p.id === id) {
@@ -263,18 +263,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.log('[AuthContext] Failed to update profile in DB:', e);
     }
-  };
+  }, [profiles]);
 
-  const deleteProfile = async (id: string) => {
+  const deleteProfile = useCallback(async (id: string) => {
     setProfiles(prev => prev.filter(p => p.id !== id));
     try {
       await apiFamilyMembers.delete(id);
     } catch (e) {
       console.log('[AuthContext] Failed to delete profile in DB:', e);
     }
-  };
+  }, []);
 
-  const addRecentService = (item: Omit<RecentServiceItem, 'id' | 'time'> & { time?: string }) => {
+  const addRecentService = useCallback((item: Omit<RecentServiceItem, 'id' | 'time'> & { time?: string }) => {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -290,14 +290,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const filtered = prev.filter(p => p.name !== item.name);
       return [newItem, ...filtered].slice(0, 6);
     });
-  };
+  }, []);
+
+  // Memo hoá value — trước đây là object literal mới mỗi lần render, khiến MỌI component đọc
+  // useAuth() (gần như toàn bộ app) re-render theo bất kỳ thay đổi state nào trong provider này,
+  // kể cả state không liên quan tới component đó đang đọc.
+  const value = useMemo<AuthContextType>(() => ({
+    currentUser, setCurrentUser, login, logout,
+    isVerified, setIsVerified, profiles, addProfile, updateProfile, deleteProfile,
+    recentServices, addRecentService
+  }), [currentUser, login, logout, isVerified, profiles, addProfile, updateProfile, deleteProfile, recentServices, addRecentService]);
 
   return (
-    <AuthContext.Provider value={{
-      currentUser, setCurrentUser, login, logout,
-      isVerified, setIsVerified, profiles, addProfile, updateProfile, deleteProfile,
-      recentServices, addRecentService
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, AppState, AppStateStatus } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -56,6 +56,7 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
 
   React.useEffect(() => {
     let isMounted = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
     const checkUnread = async () => {
       try {
         if (currentUser?.patientId) {
@@ -66,11 +67,33 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
         }
       } catch (err) { }
     };
-    checkUnread();
-    const interval = setInterval(checkUnread, 5000);
+
+    // Trước đây poll chạy 5s/lần vô thời hạn suốt phiên đăng nhập, kể cả khi app bị đưa xuống nền
+    // (không có màn hình nào hiển thị số chưa đọc để cập nhật) — tốn pin/dữ liệu di động vô ích.
+    // Chỉ chạy interval khi app đang ở foreground, dừng hẳn khi bị background thay vì tiếp tục ngầm.
+    const startPolling = () => {
+      if (intervalId) return;
+      checkUnread();
+      intervalId = setInterval(checkUnread, 5000);
+    };
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    if (AppState.currentState === 'active') startPolling();
+
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') startPolling();
+      else stopPolling();
+    });
+
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      stopPolling();
+      subscription.remove();
     };
   }, [currentUser?.patientId, state.index]);
 
