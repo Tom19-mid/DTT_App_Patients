@@ -9,16 +9,20 @@
  * - Physical Phone / LAN: 'http://<YOUR_LOCAL_IP>:5000/api'
  */
 
-import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { storage } from "./storage";
 
-// Auto-switch: 10.0.2.2 for Android Emulator, 192.168.2.101 for physical device / Expo Go
-const DEV_SERVER_IP = '192.168.2.101';
-export const BASE_URL = Platform.OS === 'android'
-  ? 'http://10.0.2.2:5000/api'
-  : `http://${DEV_SERVER_IP}:5000/api`;
+// Auto-switch: 10.0.2.2 for Android Emulator, localhost for Web, 192.168.1.8 and 192.168.2.101 for physical device / Expo Go
+const DEV_SERVER_IP = "192.168.1.8";
+export const BASE_URL =
+  Platform.OS === "web"
+    ? "http://localhost:5000/api"
+    : Platform.OS === "android"
+      ? "http://10.0.2.2:5000/api"
+      : `http://${DEV_SERVER_IP}:5000/api`;
 
-const TOKEN_KEY = 'dtt_user_token';
+const TOKEN_KEY = "dtt_user_token";
 
 // ── High-Performance Caching & Auto-Heal Engine (Stage 2 Optimization) ────────
 interface CacheItem<T> {
@@ -43,9 +47,14 @@ export const clearApiCache = (keyPrefix?: string) => {
 // timeoutMs mặc định 8s cho hầu hết endpoint; endpoint nào gọi tới AI (Gemini có thể mất vài giây
 // + backend tự retry 1 lần khi rớt mạng) cần truyền timeoutMs dài hơn để không tự bỏ cuộc trước khi
 // backend kịp trả lời thật.
-async function request<T>(endpoint: string, options: RequestInit = {}, customTtl: number = DEFAULT_TTL, timeoutMs: number = 8000): Promise<T> {
-  const isGet = !options.method || options.method.toUpperCase() === 'GET';
-  const cacheKey = `${endpoint}_${JSON.stringify(options.body || '')}`;
+async function request<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  customTtl: number = DEFAULT_TTL,
+  timeoutMs: number = 8000,
+): Promise<T> {
+  const isGet = !options.method || options.method.toUpperCase() === "GET";
+  const cacheKey = `${endpoint}_${JSON.stringify(options.body || "")}`;
 
   // 1. Instant Cache Retrieval (Stale-While-Revalidate 0ms latency)
   if (isGet && DTTQueryCache.has(cacheKey)) {
@@ -56,14 +65,14 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
       return cached.data as T;
     }
   }
-
-  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+  //const token = await SecureStore.getItemAsync(TOKEN_KET);
+  const token = await storage.getItem(TOKEN_KEY);
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   // 2. Auto-Heal Exponential Retry with Timeout Protection
@@ -91,14 +100,19 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
       const rawText = await response.text();
       let data: any = {};
       if (rawText) {
-        try { data = JSON.parse(rawText); } catch { data = {}; }
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          data = {};
+        }
       }
 
       if (!response.ok) {
         const httpError: any = new Error(
-          data.message || (response.status === 403
-            ? 'Bạn không có quyền thực hiện thao tác này.'
-            : 'Đã xảy ra lỗi khi kết nối máy chủ')
+          data.message ||
+            (response.status === 403
+              ? "Bạn không có quyền thực hiện thao tác này."
+              : "Đã xảy ra lỗi khi kết nối máy chủ"),
         );
         httpError.status = response.status;
         throw httpError;
@@ -106,14 +120,21 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
 
       // Save to cache for GET requests
       if (isGet) {
-        DTTQueryCache.set(cacheKey, { data, timestamp: Date.now(), ttl: customTtl });
+        DTTQueryCache.set(cacheKey, {
+          data,
+          timestamp: Date.now(),
+          ttl: customTtl,
+        });
       } else {
         // Automatically invalidate cache for affected domains on POST/PUT/DELETE
-        if (endpoint.includes('/appointments')) clearApiCache('/appointments');
-        if (endpoint.includes('/familymembers')) clearApiCache('/familymembers');
-        if (endpoint.includes('/notifications')) clearApiCache('/notifications');
-        if (endpoint.includes('/healthpackages')) clearApiCache('/healthpackages');
-        if (endpoint.includes('/auth/profile')) clearApiCache('/auth/profile');
+        if (endpoint.includes("/appointments")) clearApiCache("/appointments");
+        if (endpoint.includes("/familymembers"))
+          clearApiCache("/familymembers");
+        if (endpoint.includes("/notifications"))
+          clearApiCache("/notifications");
+        if (endpoint.includes("/healthpackages"))
+          clearApiCache("/healthpackages");
+        if (endpoint.includes("/auth/profile")) clearApiCache("/auth/profile");
       }
 
       return data as T;
@@ -127,57 +148,97 @@ async function request<T>(endpoint: string, options: RequestInit = {}, customTtl
       // từ server, không phải lỗi mạng, nên trả lại stale cache sẽ che giấu việc phiên đã hết hạn
       // (vd: sau khi đăng xuất, màn hình vẫn âm thầm hiện dữ liệu cũ như chưa hề đăng xuất).
       const isAuthError = error?.status === 401 || error?.status === 403;
-      if (attempt > maxRetries && isGet && !isAuthError && DTTQueryCache.has(cacheKey)) {
-        console.warn(`[Network Degraded] Serving fallback cache for ${endpoint}`);
+      if (
+        attempt > maxRetries &&
+        isGet &&
+        !isAuthError &&
+        DTTQueryCache.has(cacheKey)
+      ) {
+        console.warn(
+          `[Network Degraded] Serving fallback cache for ${endpoint}`,
+        );
         return DTTQueryCache.get(cacheKey)!.data as T;
       }
 
       // 401/403 sẽ luôn thất bại lại y hệt khi retry với cùng token — dừng ngay thay vì thử lại vô ích.
       if (isAuthError) break;
 
-      if (attempt <= maxRetries && error.name !== 'AbortError') {
+      if (attempt <= maxRetries && error.name !== "AbortError") {
         const backoffDelay = Math.pow(2, attempt) * 300; // 600ms, 1200ms
-        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay));
       }
     }
   }
 
-  if (lastError?.name === 'AbortError') {
-    throw new Error('Kết nối máy chủ bị quá tải (Timeout). Vui lòng kiểm tra đường truyền mạng.');
+  if (lastError?.name === "AbortError") {
+    throw new Error(
+      "Kết nối máy chủ bị quá tải (Timeout). Vui lòng kiểm tra đường truyền mạng.",
+    );
   }
   throw lastError;
 }
 
-
 // ── Auth APIs ──────────────────────────────────────────────────────────────────
 export const apiAuth = {
   login: (phone: string, password: string) =>
-    request<{ token: string; userId: string; patientId: number; fullName: string; phone: string; email: string; verificationStatus: string; otpCode?: string }>(
-      '/auth/login',
-      {
-        method: 'POST',
-        body: JSON.stringify({ phone, password }),
-      }
-    ),
-
-  register: (fullName: string, phone: string, email: string, password: string) =>
-    request<{ token: string; userId: string; patientId: number; fullName: string; phone: string; email: string; verificationStatus: string; otpCode?: string }>(
-      '/auth/register',
-      {
-        method: 'POST',
-        body: JSON.stringify({ fullName, phone, email, password }),
-      }
-    ),
-
-  updateProfile: (data: { patientId: number; fullName?: string; email?: string; gender?: string; address?: string; healthInsuranceNumber?: string; dateOfBirth?: string }) =>
-    request<{ success: boolean; message: string; fullName: string }>('/auth/profile', {
-      method: 'PUT',
-      body: JSON.stringify(data),
+    request<{
+      token: string;
+      userId: string;
+      patientId: number;
+      fullName: string;
+      phone: string;
+      email: string;
+      verificationStatus: string;
+      otpCode?: string;
+    }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ phone, password }),
     }),
 
-  changePassword: (phone: string, currentPassword: string, newPassword: string) =>
-    request<{ success: boolean; message: string }>('/auth/change-password', {
-      method: 'POST',
+  register: (
+    fullName: string,
+    phone: string,
+    email: string,
+    password: string,
+  ) =>
+    request<{
+      token: string;
+      userId: string;
+      patientId: number;
+      fullName: string;
+      phone: string;
+      email: string;
+      verificationStatus: string;
+      otpCode?: string;
+    }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ fullName, phone, email, password }),
+    }),
+
+  updateProfile: (data: {
+    patientId: number;
+    fullName?: string;
+    email?: string;
+    gender?: string;
+    address?: string;
+    healthInsuranceNumber?: string;
+    dateOfBirth?: string;
+  }) =>
+    request<{ success: boolean; message: string; fullName: string }>(
+      "/auth/profile",
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      },
+    ),
+
+  changePassword: (
+    phone: string,
+    currentPassword: string,
+    newPassword: string,
+  ) =>
+    request<{ success: boolean; message: string }>("/auth/change-password", {
+      method: "POST",
       body: JSON.stringify({ phone, currentPassword, newPassword }),
     }),
 };
@@ -185,26 +246,42 @@ export const apiAuth = {
 // ── Medical Data APIs ─────────────────────────────────────────────────────────
 export const apiMedical = {
   getSpecialties: () =>
-    request<Array<{ specialtyId: number; specialtyName: string; description: string }>>('/specialties'),
+    request<
+      Array<{ specialtyId: number; specialtyName: string; description: string }>
+    >("/specialties"),
 
   getDoctors: (specialtyId?: number) =>
-    request<Array<{ doctorId: number; fullName: string; degree: string; experienceYears: number; rating: number }>>(
-      `/doctors${specialtyId ? `?specialtyId=${specialtyId}` : ''}`
-    ),
+    request<
+      Array<{
+        doctorId: number;
+        fullName: string;
+        degree: string;
+        experienceYears: number;
+        rating: number;
+      }>
+    >(`/doctors${specialtyId ? `?specialtyId=${specialtyId}` : ""}`),
 
-  getDoctorSchedules: (doctorId?: number, specialtyId?: number, dateStr?: string) =>
-    request<Array<{
-      doctorId: number;
-      specialtyId: number;
-      fullName: string;
-      degree: string;
-      clinicRoom: string;
-      date: string;
-      dayOfWeek: string;
-      isWorking: boolean;
-      statusText: string;
-      timeSlots: string[];
-    }>>(`/doctors/schedules?${doctorId ? `doctorId=${doctorId}&` : ''}${specialtyId ? `specialtyId=${specialtyId}&` : ''}${dateStr ? `dateStr=${dateStr}` : ''}`),
+  getDoctorSchedules: (
+    doctorId?: number,
+    specialtyId?: number,
+    dateStr?: string,
+  ) =>
+    request<
+      Array<{
+        doctorId: number;
+        specialtyId: number;
+        fullName: string;
+        degree: string;
+        clinicRoom: string;
+        date: string;
+        dayOfWeek: string;
+        isWorking: boolean;
+        statusText: string;
+        timeSlots: string[];
+      }>
+    >(
+      `/doctors/schedules?${doctorId ? `doctorId=${doctorId}&` : ""}${specialtyId ? `specialtyId=${specialtyId}&` : ""}${dateStr ? `dateStr=${dateStr}` : ""}`,
+    ),
 };
 
 export interface PatientAppointmentDto {
@@ -251,25 +328,31 @@ export const apiAppointment = {
       clinicRoom: string;
       fee: string;
       createdAt: string;
-    }>('/appointments', {
-      method: 'POST',
+    }>("/appointments", {
+      method: "POST",
       body: JSON.stringify(data),
     }),
 
   getPatientAppointments: (patientId: number) =>
     request<PatientAppointmentDto[]>(`/appointments/patient/${patientId}`),
 
-  cancelAppointment: (id: number, cancelledBy?: string, cancelReason?: string) =>
-    request<{ success: boolean; message: string }>(`/appointments/${id}/cancel`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        cancelReason: cancelReason || 'Bệnh nhân hủy lịch qua ứng dụng',
-        cancelledBy: cancelledBy || 'patient',
-      }),
-    }),
+  cancelAppointment: (
+    id: number,
+    cancelledBy?: string,
+    cancelReason?: string,
+  ) =>
+    request<{ success: boolean; message: string }>(
+      `/appointments/${id}/cancel`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          cancelReason: cancelReason || "Bệnh nhân hủy lịch qua ứng dụng",
+          cancelledBy: cancelledBy || "patient",
+        }),
+      },
+    ),
 
-  getAllAppointments: () =>
-    request<Array<any>>('/appointments'),
+  getAllAppointments: () => request<Array<any>>("/appointments"),
 };
 
 // ── Health Package APIs ───────────────────────────────────────────────────────
@@ -280,7 +363,7 @@ export interface HealthPackage {
   description: string;
   price: number;
   priceFormatted: string;
-  genderTarget: 'male' | 'female' | 'all';
+  genderTarget: "male" | "female" | "all";
   imageUrl?: string;
   bookedCount: number;
   bookedCountFormatted: string;
@@ -289,18 +372,22 @@ export interface HealthPackage {
 }
 
 export const apiHealthPackage = {
-  getAll: (gender?: 'male' | 'female') =>
-    request<HealthPackage[]>(`/healthpackages${gender ? `?gender=${gender}` : ''}`),
+  getAll: (gender?: "male" | "female") =>
+    request<HealthPackage[]>(
+      `/healthpackages${gender ? `?gender=${gender}` : ""}`,
+    ),
 
-  getById: (id: number) =>
-    request<HealthPackage>(`/healthpackages/${id}`),
+  getById: (id: number) => request<HealthPackage>(`/healthpackages/${id}`),
 
-  bookPackage: (id: number, data: {
-    patientId: number;
-    patientName: string;
-    preferredDate?: string;
-    priceFormatted?: string;
-  }) =>
+  bookPackage: (
+    id: number,
+    data: {
+      patientId: number;
+      patientName: string;
+      preferredDate?: string;
+      priceFormatted?: string;
+    },
+  ) =>
     request<{
       success: boolean;
       message: string;
@@ -310,7 +397,7 @@ export const apiHealthPackage = {
       preferredDate: string;
       queueNumber: number;
     }>(`/healthpackages/${id}/book`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     }),
 };
@@ -328,7 +415,7 @@ export interface ProfileDto {
   // hoặc 'verified' — không có action "reject" nào tồn tại. 'rejected' giữ trong type để khớp
   // với AuthContext.VerificationStatus (phòng khi tính năng từ chối hồ sơ được thêm sau), nhưng
   // hiện tại backend không bao giờ trả về giá trị này.
-  verificationStatus: 'pending' | 'verified' | 'rejected';
+  verificationStatus: "pending" | "verified" | "rejected";
   isVerified?: boolean;
   verificationNote?: string;
   dob?: string;
@@ -352,30 +439,36 @@ export const apiFamilyMembers = {
     cccd?: string;
     bhyt?: string;
   }) =>
-    request<{ success: boolean; message: string; profile?: ProfileDto }>('/familymembers', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    request<{ success: boolean; message: string; profile?: ProfileDto }>(
+      "/familymembers",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+    ),
 
-  update: (id: string, data: {
-    realId?: number;
-    isOwner?: boolean;
-    name?: string;
-    relationship?: string;
-    dob?: string;
-    gender?: string;
-    phone?: string;
-    cccd?: string;
-    bhyt?: string;
-  }) =>
+  update: (
+    id: string,
+    data: {
+      realId?: number;
+      isOwner?: boolean;
+      name?: string;
+      relationship?: string;
+      dob?: string;
+      gender?: string;
+      phone?: string;
+      cccd?: string;
+      bhyt?: string;
+    },
+  ) =>
     request<{ success: boolean; message: string }>(`/familymembers/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(data),
     }),
 
   delete: (id: string) =>
     request<{ success: boolean; message: string }>(`/familymembers/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     }),
 };
 
@@ -383,7 +476,7 @@ export const apiFamilyMembers = {
 
 export interface NotificationItem {
   id: string;
-  type: 'appointment' | 'result' | 'promotion' | 'system' | string;
+  type: "appointment" | "result" | "promotion" | "system" | string;
   title: string;
   message: string;
   time: string;
@@ -399,14 +492,16 @@ export const apiNotifications = {
 
   markAsRead: async (id: string | number) => {
     DTTQueryCache.forEach((val, key) => {
-      if (key.includes('/notifications/patient/')) {
+      if (key.includes("/notifications/patient/")) {
         const list = val.data as NotificationItem[];
         if (Array.isArray(list)) {
-          val.data = list.map(n => n.id === id ? { ...n, read: true } : n);
+          val.data = list.map((n) => (n.id === id ? { ...n, read: true } : n));
         }
       }
     });
-    return request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PUT' }).catch(() => ({ success: true }));
+    return request<{ success: boolean }>(`/notifications/${id}/read`, {
+      method: "PUT",
+    }).catch(() => ({ success: true }));
   },
 
   markAllAsRead: async (patientId: number) => {
@@ -414,11 +509,14 @@ export const apiNotifications = {
       if (key.includes(`/notifications/patient/${patientId}`)) {
         const list = val.data as NotificationItem[];
         if (Array.isArray(list)) {
-          val.data = list.map(n => ({ ...n, read: true }));
+          val.data = list.map((n) => ({ ...n, read: true }));
         }
       }
     });
-    return request<{ success: boolean; count: number }>(`/notifications/patient/${patientId}/read-all`, { method: 'PUT' }).catch(() => ({ success: true, count: 0 }));
+    return request<{ success: boolean; count: number }>(
+      `/notifications/patient/${patientId}/read-all`,
+      { method: "PUT" },
+    ).catch(() => ({ success: true, count: 0 }));
   },
 };
 
@@ -440,11 +538,18 @@ export const apiMedicalRecords = {
 // ── Patients & QR Linking APIs ────────────────────────────────────────────────
 
 export const apiPatients = {
-  linkByQr: (data: { patientId: string; verifyCode: string; ownerPatientId?: number }) =>
-    request<{ success: boolean; message: string; profile?: ProfileDto }>('/patients/link-by-qr', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  linkByQr: (data: {
+    patientId: string;
+    verifyCode: string;
+    ownerPatientId?: number;
+  }) =>
+    request<{ success: boolean; message: string; profile?: ProfileDto }>(
+      "/patients/link-by-qr",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+    ),
 
   // Lấy thông tin & trạng thái xác thực của bệnh nhân từ DB (dùng khi app cần refresh trạng thái sau khi Lễ Tân duyệt CCCD)
   getProfile: (patientId: number) =>
@@ -456,7 +561,7 @@ export const apiPatients = {
         phone: string;
         cccd: string;
         bhyt: string;
-        verificationStatus: 'pending' | 'verified' | 'rejected';
+        verificationStatus: "pending" | "verified" | "rejected";
         verificationNote?: string;
         dob?: string;
         gender?: string;
@@ -468,18 +573,25 @@ export const apiPatients = {
     try {
       const res = await request<{
         success: boolean;
-        patient: { verificationStatus: string; cccd?: string; verificationNote?: string };
+        patient: {
+          verificationStatus: string;
+          cccd?: string;
+          verificationNote?: string;
+        };
       }>(`/patients/${patientId}`);
       if (res?.success && res.patient) {
         return {
-          verified: res.patient.verificationStatus === 'verified',
-          verificationStatus: res.patient.verificationStatus as 'pending' | 'verified' | 'rejected',
+          verified: res.patient.verificationStatus === "verified",
+          verificationStatus: res.patient.verificationStatus as
+            | "pending"
+            | "verified"
+            | "rejected",
           cccd: res.patient.cccd,
           note: res.patient.verificationNote,
         };
       }
-    } catch { }
-    return { verified: false, verificationStatus: 'pending' as const };
+    } catch {}
+    return { verified: false, verificationStatus: "pending" as const };
   },
 };
 
@@ -489,7 +601,7 @@ export const apiPatients = {
 
 export interface ChatMessageItem {
   messageId: number;
-  senderType: 'Patient' | 'AI' | 'Staff';
+  senderType: "Patient" | "AI" | "Staff";
   senderUserId?: string | null;
   // Chỉ có giá trị khi senderType='Staff' — tên thật của lễ tân đang tư vấn.
   senderName?: string | null;
@@ -499,19 +611,23 @@ export interface ChatMessageItem {
 
 export const apiChat = {
   createSession: () =>
-    request<{ success: boolean; sessionId: number; status: string }>('/chat/sessions', {
-      method: 'POST',
-    }),
+    request<{ success: boolean; sessionId: number; status: string }>(
+      "/chat/sessions",
+      {
+        method: "POST",
+      },
+    ),
 
   // Tìm phiên đang mở (AI/Escalated) gần nhất của bệnh nhân — gọi TRƯỚC createSession mỗi khi vào
   // màn Chat, để tiếp tục phiên cũ thay vì luôn tạo mới (không thì phiên đang chờ Lễ tân trả lời sẽ
   // bị "mồ côi" mỗi khi bệnh nhân thoát ra vào lại). customTtl=0 — không cache, luôn kiểm tra mới nhất.
   getActiveSession: () =>
-    request<{ success: boolean; hasActive: boolean; sessionId?: number; status?: string }>(
-      '/chat/sessions/active',
-      {},
-      0
-    ),
+    request<{
+      success: boolean;
+      hasActive: boolean;
+      sessionId?: number;
+      status?: string;
+    }>("/chat/sessions/active", {}, 0),
 
   // timeoutMs=28000 — khi status='AI', backend chờ Gemini trả lời (tự retry 1 lần nếu rớt mạng,
   // mỗi lần tối đa ~12s) trước khi trả về; 8s mặc định của request() sẽ tự bỏ cuộc quá sớm và
@@ -526,10 +642,15 @@ export const apiChat = {
       shouldEscalate?: boolean;
       // 'Closed' khi AI phát hiện bệnh nhân muốn kết thúc cuộc trò chuyện (vd: "kết thúc", "tạm biệt")
       status?: string;
-    }>(`/chat/sessions/${sessionId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({ content }),
-    }, DEFAULT_TTL, 28000),
+    }>(
+      `/chat/sessions/${sessionId}/messages`,
+      {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      },
+      DEFAULT_TTL,
+      28000,
+    ),
 
   // customTtl=0 — luôn lấy dữ liệu mới nhất khi polling, không dùng cache 60s mặc định
   // (nếu không, bệnh nhân sẽ không thấy tin nhắn mới của Lễ tân trong tối đa 60 giây).
@@ -537,13 +658,16 @@ export const apiChat = {
     request<{ success: boolean; status: string; messages: ChatMessageItem[] }>(
       `/chat/sessions/${sessionId}/messages`,
       {},
-      0
+      0,
     ),
 
   escalate: (sessionId: number) =>
-    request<{ success: boolean; status: string }>(`/chat/sessions/${sessionId}/escalate`, {
-      method: 'POST',
-    }),
+    request<{ success: boolean; status: string }>(
+      `/chat/sessions/${sessionId}/escalate`,
+      {
+        method: "POST",
+      },
+    ),
 };
 
 // ── Stage 2 Optimization: Intelligent Pre-Warming Engine ──────────────────────
@@ -551,16 +675,15 @@ export const prewarmCoreData = (patientId?: number) => {
   // Execute background requests to warm up in-memory cache without blocking main UI thread
   setTimeout(() => {
     try {
-      apiMedical.getDoctors().catch(() => { });
-      apiHealthPackage.getAll().catch(() => { });
+      apiMedical.getDoctors().catch(() => {});
+      apiHealthPackage.getAll().catch(() => {});
       if (patientId) {
-        apiAppointment.getPatientAppointments(patientId).catch(() => { });
-        apiFamilyMembers.getByPatient(patientId).catch(() => { });
+        apiAppointment.getPatientAppointments(patientId).catch(() => {});
+        apiFamilyMembers.getByPatient(patientId).catch(() => {});
       }
-      console.log('[Stage 2] Pre-warmed core data cache successfully.');
+      console.log("[Stage 2] Pre-warmed core data cache successfully.");
     } catch (e) {
       // Suppress network logs during silent warmup
     }
   }, 300);
 };
-
