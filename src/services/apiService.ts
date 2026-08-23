@@ -10,17 +10,42 @@
  */
 
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { storage } from "./storage";
 
-// Auto-switch: 10.0.2.2 for Android Emulator, localhost for Web, 192.168.1.8 and 192.168.2.101 for physical device / Expo Go
-const DEV_SERVER_IP = "192.168.1.8";
+// // Auto-switch: 10.0.2.2 for Android Emulator, localhost for Web, 192.168.1.8 and 192.168.2.101 for physical device / Expo Go
+// const DEV_SERVER_IP = "192.168.1.8";
+// export const BASE_URL =
+//   Platform.OS === "web"
+//     ? "http://localhost:5000/api"
+//     : Platform.OS === "android"
+//       ? "http://10.0.2.2:5000/api"
+//       : `http://${DEV_SERVER_IP}:5000/api`;
+
+// Tự động nhận diện IP của máy tính đang chạy Expo Metro bundler
+const getDevServerIp = (): string => {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    (Constants as any).manifest2?.extra?.expoClient?.hostUri;
+  if (hostUri) {
+    return hostUri.split(":")[0];
+  }
+  return "192.168.1.6";
+};
+
+// const DEV_SERVER_IP = "192.168.1.6";
+const DEV_SERVER_IP = getDevServerIp();
 export const BASE_URL =
   Platform.OS === "web"
     ? "http://localhost:5000/api"
-    : Platform.OS === "android"
-      ? "http://10.0.2.2:5000/api"
-      : `http://${DEV_SERVER_IP}:5000/api`;
+    : // : Platform.OS === "android"
+      //   ? "http://192.168.1.6:5000/api"
+      `http://${DEV_SERVER_IP}:5000/api`;
+
+if (__DEV__) {
+  console.log(`[API Service] BASE_URL configured as: ${BASE_URL}`);
+}
 
 const TOKEN_KEY = "dtt_user_token";
 
