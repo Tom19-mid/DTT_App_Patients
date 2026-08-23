@@ -26,12 +26,19 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
     fee: '250.000đ',
   };
 
-  const isPkg = safeApp.isPackage || safeApp.doctor === '' || safeApp.specialtyKey === 'Khám Tổng Quát Cơ Bản' || (typeof safeApp.specialtyKey === 'string' && (safeApp.specialtyKey.includes('Tầm soát') || safeApp.specialtyKey.includes('Khám Tổng Quát') || safeApp.specialtyKey.includes('Gói khám'))) || false;
+  // Trước đây còn đoán qua specialtyKey.includes('Tầm soát'/'Khám Tổng Quát') — 1 lịch khám bác sĩ
+  // THƯỜNG mà tên chuyên khoa/lý do khám tình cờ chứa các cụm này sẽ hiện NHẦM thành gói khám. Chỉ
+  // dựa vào cờ isPackage thật (nếu có) hoặc doctor === '' — quy ước THẬT do backend đặt khi đây đúng
+  // là gói khám (AppointmentsController.cs chỉ để trống tên bác sĩ trong trường hợp đó).
+  const isPkg = safeApp.isPackage || safeApp.doctor === '' || false;
   const isInProgress = safeApp.status === 'InProgress' || safeApp.statusKey === 'in_progress' || safeApp.statusId === 3;
   const isCheckedIn = safeApp.status === 'CheckedIn' || safeApp.statusKey === 'checked_in' || safeApp.statusId === 7;
   const isWaitingForDoctor = safeApp.status === 'WaitingForDoctor' || safeApp.statusKey === 'waiting_for_doctor' || safeApp.statusId === 8;
   // Bác sĩ đã chỉ định Xét nghiệm/Siêu âm — bệnh nhân đang ở phòng Cận Lâm Sàng, chưa quay lại phòng khám
   const isAwaitingResults = safeApp.status === 'AwaitingTestResults' || safeApp.statusKey === 'awaiting_test_results' || safeApp.statusId === 9;
+  // Trước đây màn này không check Cancelled, nên lịch đã hủy mở từ lịch sử luôn hiện "Hoàn thành"
+  // giống lịch khám bình thường (CalendarScreen ở danh sách thì map đúng, chỉ màn chi tiết bị bỏ sót).
+  const isCancelled = safeApp.status === 'Cancelled' || safeApp.status === 'cancelled' || safeApp.statusKey === 'cancelled' || safeApp.statusId === 5;
 
   const handleCancel = () => {
     showAlert({
@@ -110,6 +117,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.statusBadgeIcon}>
             <Ionicons
               name={
+                isCancelled ? "close-circle" :
                 isAwaitingResults ? "flask" :
                 isInProgress ? "pulse" :
                 isWaitingForDoctor ? "fitness" :
@@ -118,6 +126,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
               }
               size={48}
               color={
+                isCancelled ? "#EF4444" :
                 isAwaitingResults ? "#7C3AED" :
                 isInProgress ? "#6366F1" :
                 isWaitingForDoctor ? "#8B5CF6" :
@@ -128,21 +137,25 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
           </View>
           <Text style={[
             styles.statusTitle,
+            isCancelled && { color: "#EF4444" },
             isAwaitingResults && { color: "#7C3AED" },
             isInProgress && { color: "#6366F1" },
             isWaitingForDoctor && { color: "#8B5CF6" },
             isCheckedIn && { color: "#10B981" },
-            isHistory && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && { color: isDarkMode ? '#60A5FA' : COLORS.primary },
-            !isHistory && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && isDarkMode && { color: '#34D399' }
+            isHistory && !isCancelled && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && { color: isDarkMode ? '#60A5FA' : COLORS.primary },
+            !isHistory && !isCancelled && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && isDarkMode && { color: '#34D399' }
           ]}>
-            {isAwaitingResults ? "Đang chờ kết quả Xét nghiệm/Siêu âm" :
+            {isCancelled ? "Đã hủy lịch khám" :
+             isAwaitingResults ? "Đang chờ kết quả Xét nghiệm/Siêu âm" :
              isInProgress ? (t('in_progress') !== 'in_progress' ? t('in_progress') : "Đang khám lâm sàng") :
              isWaitingForDoctor ? "Đã đo sinh hiệu — Chờ khám" :
              isCheckedIn ? "Đã Check-in tại quầy Lễ tân" :
              isHistory ? t('completed') : t('confirmed')}
           </Text>
           <Text style={[styles.statusSubtitle, isDarkMode && { color: '#9CA3AF' }]}>
-            {isAwaitingResults
+            {isCancelled
+              ? "Lịch khám này đã được hủy và không còn hiệu lực. Bạn có thể đặt lại lịch khám mới bất kỳ lúc nào."
+              : isAwaitingResults
               ? "Bác sĩ đã chỉ định Xét nghiệm/Siêu âm cho bạn. Vui lòng di chuyển đến phòng Cận Lâm Sàng và chờ Kỹ thuật viên gọi tên."
               : isInProgress
               ? "Bác sĩ đang mời bạn vào phòng khám. Vui lòng chuẩn bị và di chuyển ngay!"

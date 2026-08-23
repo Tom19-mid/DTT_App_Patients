@@ -51,12 +51,18 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
   const slideAnim  = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  const [featuredDoctor, setFeaturedDoctor] = useState<any>(null);
+  // Trước đây chỉ lấy doctors[0] ("1 bác sĩ tiêu biểu") — theo đúng yêu cầu QA gốc ("Cần hiện hết các
+  // bác sĩ thuộc chuyên khoa"), giờ hiện TOÀN BỘ bác sĩ Active/OnLeave của chuyên khoa này ngay trong
+  // bottom sheet thay vì bắt phải bấm sang màn danh sách đầy đủ mới thấy được bác sĩ thứ 2 trở đi.
+  const [doctors, setDoctors] = useState<any[]>([]);
   const [doctorLoading, setDoctorLoading] = useState(false);
+  // doctorId -> có lịch khám HÔM NAY hay không (lấy từ GET /api/Doctors/schedules) — dùng để xám nút
+  // "Đặt khám" cho bác sĩ không có lịch hôm nay, tránh bệnh nhân bấm vào rồi mới biết không đặt được.
+  const [workingTodayMap, setWorkingTodayMap] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (visible && specialty) {
-      fetchFeaturedDoctor(specialty.id);
+      fetchDoctors(specialty.id);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }),
         Animated.timing(backdropAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
@@ -69,23 +75,31 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
     }
   }, [visible, specialty]);
 
-  const fetchFeaturedDoctor = async (specialtyId?: number) => {
+  const fetchDoctors = async (specialtyId?: number) => {
     try {
       setDoctorLoading(true);
-      const doctors = await apiMedical.getDoctors(specialtyId);
-      if (doctors && doctors.length > 0) {
-        setFeaturedDoctor(doctors[0]);
-      } else {
-        setFeaturedDoctor(null);
+      const list = await apiMedical.getDoctors(specialtyId);
+      setDoctors(Array.isArray(list) ? list : []);
+
+      // Lấy lịch khám THẬT của hôm nay cho cả chuyên khoa này trong 1 lần gọi, để biết bác sĩ nào
+      // không có lịch hôm nay mà xám nút "Đặt khám" — không chặn hiện thông tin bác sĩ, chỉ chặn bấm.
+      try {
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+        const schedules = await apiMedical.getDoctorSchedules(undefined, specialtyId, todayStr);
+        const map: Record<number, boolean> = {};
+        (schedules || []).forEach((s: any) => { map[s.doctorId] = !!s.isWorking; });
+        setWorkingTodayMap(map);
+      } catch (schedErr) {
+        console.log('Error fetching today schedules:', schedErr);
+        setWorkingTodayMap({});
       }
     } catch (e) {
-      console.log('Error fetching featured doctor:', e);
-      setFeaturedDoctor({
-        fullName: 'BS. CKII Nguyễn Văn A',
-        degree: 'Chuyên khoa I Nội tổng quát',
-        rating: 4.9,
-        reviewCount: 120
-      });
+      console.log('Error fetching doctors:', e);
+      setDoctors([
+        { doctorId: -1, fullName: 'BS. CKII Nguyễn Văn A', degree: 'Chuyên khoa I Nội tổng quát', rating: 4.9, reviewCount: 120 },
+      ]);
+      setWorkingTodayMap({});
     } finally {
       setDoctorLoading(false);
     }
@@ -189,41 +203,64 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
             ))}
           </View>
 
-          {/* ── Bác sĩ chuyên khoa tiêu biểu (Lấy từ API) ── */}
+          {/* ── Bác sĩ chuyên khoa (Lấy từ API — hiện đủ, không chỉ 1 bác sĩ tiêu biểu) ── */}
           <View style={styles.appointmentSection}>
             <Text style={[styles.sectionTitle, isDarkMode && { color: '#F3F4F6' }]}>{t('specialty_doctors')}</Text>
-            
+
             {doctorLoading ? (
               <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: 16 }} />
-            ) : featuredDoctor ? (
-              <TouchableOpacity 
-                style={[styles.doctorCard, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }]} 
-                activeOpacity={0.8}
-                onPress={() => {
-                  onClose();
-                  navigation.navigate('SpecialtyDoctors', { specialty: { name: displaySpecialtyName, id: specialty.id } });
-                }}
-              >
-                <View style={[styles.doctorAvatarPlaceholder, isDarkMode && { backgroundColor: '#1F2937' }]}>
-                  <FontAwesome5 name="user-md" size={24} color={isDarkMode ? '#60A5FA' : COLORS.primary} />
-                </View>
-                
-                <View style={styles.doctorInfo}>
-                  <Text style={[styles.doctorName, isDarkMode && { color: '#F3F4F6' }]}>{featuredDoctor.fullName || 'BS. CKII Nguyễn Văn A'}</Text>
-                  <Text style={[styles.doctorSpecialty, isDarkMode && { color: '#9CA3AF' }]}>{featuredDoctor.degree || displaySpecialtyName}</Text>
-                  <View style={styles.doctorRatingRow}>
-                    <Ionicons name="star" size={14} color="#FBBF24" />
-                    <Text style={[styles.doctorRating, isDarkMode && { color: '#9CA3AF' }]}>{featuredDoctor.rating || 5.0} ({featuredDoctor.reviewCount || 10} {t('reviews')})</Text>
-                  </View>
-                </View>
+            ) : doctors.length > 0 ? (
+              doctors.map((doc, idx) => {
+                // Mặc định coi là CÓ lịch nếu chưa xác định được (lỗi tải lịch hôm nay) — không vì 1
+                // API phụ lỗi mà khóa cứng luôn nút đặt khám của mọi bác sĩ.
+                const isWorkingToday = workingTodayMap[doc.doctorId] !== false;
+                return (
+                <View
+                  key={doc.doctorId ?? idx}
+                  style={[styles.doctorCard, SHADOWS.input, isDarkMode && { backgroundColor: '#374151' }, idx > 0 && { marginTop: 10 }]}
+                >
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      onClose();
+                      navigation.navigate('SpecialtyDoctors', { specialty: { name: displaySpecialtyName, id: specialty.id } });
+                    }}
+                  >
+                    <View style={[styles.doctorAvatarPlaceholder, isDarkMode && { backgroundColor: '#1F2937' }]}>
+                      <FontAwesome5 name="user-md" size={24} color={isDarkMode ? '#60A5FA' : COLORS.primary} />
+                    </View>
 
-                <View style={styles.bookBtnSmall}>
-                  <Text style={styles.bookBtnSmallText}>{t('book_btn')}</Text>
+                    <View style={styles.doctorInfo}>
+                      <Text style={[styles.doctorName, isDarkMode && { color: '#F3F4F6' }]}>{doc.fullName || 'Bác sĩ DTT'}</Text>
+                      <Text style={[styles.doctorSpecialty, isDarkMode && { color: '#9CA3AF' }]}>{doc.degree || displaySpecialtyName}</Text>
+                      <View style={styles.doctorRatingRow}>
+                        <Ionicons name="star" size={14} color="#FBBF24" />
+                        <Text style={[styles.doctorRating, isDarkMode && { color: '#9CA3AF' }]}>{doc.rating || 5.0} ({doc.reviewCount || 10} {t('reviews')})</Text>
+                      </View>
+                      {!isWorkingToday && (
+                        <Text style={styles.noScheduleTodayText}>Hôm nay không có lịch khám</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.bookBtnSmall, !isWorkingToday && styles.bookBtnSmallDisabled]}
+                    activeOpacity={isWorkingToday ? 0.8 : 1}
+                    disabled={!isWorkingToday}
+                    onPress={() => {
+                      onClose();
+                      navigation.navigate('SpecialtyDoctors', { specialty: { name: displaySpecialtyName, id: specialty.id } });
+                    }}
+                  >
+                    <Text style={[styles.bookBtnSmallText, !isWorkingToday && styles.bookBtnSmallTextDisabled]}>{t('book_btn')}</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+                );
+              })
             ) : (
               <Text style={{ fontSize: 13, color: COLORS.subtext, fontStyle: 'italic', marginVertical: 8 }}>
-                Chưa có thông tin bác sĩ tiêu biểu.
+                Chưa có bác sĩ nào thuộc chuyên khoa này.
               </Text>
             )}
           </View>
@@ -301,9 +338,12 @@ const styles = StyleSheet.create({
   doctorSpecialty: { fontSize: 12, color: COLORS.placeholder, marginBottom: 6 },
   doctorRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   doctorRating: { fontSize: 12, color: COLORS.text, fontWeight: '500' },
+  noScheduleTodayText: { fontSize: 11, color: '#EF4444', fontWeight: '600', marginTop: 4 },
   bookBtnSmall: {
     backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 20,
   },
+  bookBtnSmallDisabled: { backgroundColor: '#E2E8F0' },
   bookBtnSmallText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  bookBtnSmallTextDisabled: { color: '#94A3B8' },
 });

@@ -25,6 +25,8 @@ const PACKAGE_FALLBACK_IMAGES: Record<number, string> = {
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
+// Trước đây chỉ có 8/11 chuyên khoa — thiếu hẳn Răng hàm mặt/Tai-Mũi-Họng/Mắt (specialty_id 9-11
+// thêm sau qua Web Admin), khiến người dùng không thể bấm vào lưới icon trang chủ để duyệt 3 khoa này.
 const specialties = [
   { id: 1, nameKey: 'general_internal',   icon: 'stethoscope',   type: 'fa5' as const },
   { id: 2, nameKey: 'pediatrics',        icon: 'baby',          type: 'fa5' as const },
@@ -34,12 +36,18 @@ const specialties = [
   { id: 6, nameKey: 'neurology',       icon: 'brain',         type: 'fa5' as const },
   { id: 7, nameKey: 'dermatology',         icon: 'hand-sparkles', type: 'fa5' as const },
   { id: 8, nameKey: 'imaging', icon: 'bullseye', type: 'fa5' as const },
+  { id: 9, nameKey: 'dentistry', icon: 'tooth', type: 'fa5' as const },
+  { id: 10, nameKey: 'otolaryngology', icon: 'deaf', type: 'fa5' as const },
+  { id: 11, nameKey: 'ophthalmology', icon: 'eye', type: 'fa5' as const },
 ];
 
+// nameKey trước đây ('lookup_results'/'invoices'/'guidelines') KHÔNG TỒN TẠI trong từ điển dịch
+// (SettingsContext.tsx) — chỉ "sống sót" vì màn hình render dùng 1 mảng "keys" riêng khác (đã gỡ bỏ)
+// tình cờ có đúng key thật. Sửa lại nameKey khớp đúng key thật đang có sẵn bản dịch.
 const services = [
-  { id: 1, nameKey: 'lookup_results',     icon: 'file-medical-alt',    type: 'fa5' as const },
-  { id: 2, nameKey: 'invoices',  icon: 'file-invoice-dollar', type: 'fa5' as const },
-  { id: 3, nameKey: 'guidelines', icon: 'book-medical',        type: 'fa5' as const },
+  { id: 1, nameKey: 'test_results',     icon: 'file-medical-alt',    type: 'fa5' as const },
+  { id: 2, nameKey: 'receipts',  icon: 'file-invoice-dollar', type: 'fa5' as const },
+  { id: 3, nameKey: 'info_guide', icon: 'book-medical',        type: 'fa5' as const },
   { id: 4, nameKey: 'medical_info',    icon: 'clipboard-list',      type: 'fa5' as const },
 ];
 
@@ -49,12 +57,6 @@ const renderIcon = (item: { icon: string; type: string }, size = 36) => {
     return <FontAwesome5 name={item.icon as any} size={size} color={COLORS.primary} />;
   return <MaterialCommunityIcons name={item.icon as any} size={size + 4} color={COLORS.primary} />;
 };
-
-const RECENT_SERVICES = [
-  { id: 1, name: 'BS. Nguyễn Văn A', detail: 'Nội tổng quát', time: 'Khám gần nhất: 15/05', icon: 'stethoscope', type: 'doctor' },
-  { id: 2, name: 'Nhi khoa', detail: 'BS. Lê Thị B', time: 'Khám gần nhất: 21/07', icon: 'baby', type: 'specialty' },
-  { id: 3, name: 'Gói Khám Nam', detail: 'DTT Healthcare', time: 'Đã lưu', icon: 'medkit', type: 'package' },
-];
 
 const getShortName = (fullName?: string) => {
   if (!fullName || fullName.trim() === '') return 'Khách hàng';
@@ -165,8 +167,9 @@ const HomeScreen = ({ navigation }: any) => {
   };
 
   const openBottomSheet = useCallback((specialty: typeof specialties[0]) => {
-    const keys = ['general_internal', 'pediatrics', 'obstetrics', 'musculoskeletal', 'cardiology', 'neurology', 'dermatology', 'imaging'];
-    const specName = t(keys[specialty.id - 1]) || 'Chuyên khoa';
+    // Cùng lỗi với lưới chuyên khoa: mảng "keys" riêng chỉ 8 phần tử tràn chỉ số với 3 khoa mới
+    // (id 9,10,11) — dùng thẳng specialty.nameKey đã có sẵn đúng key thay vì tính lại qua mảng cũ.
+    const specName = t(specialty.nameKey) || 'Chuyên khoa';
 
     addRecentService({
       name: specName,
@@ -326,8 +329,10 @@ const HomeScreen = ({ navigation }: any) => {
         {/* ── Specialties: 4-column GRID (tap to open sheet) ── */}
         <View style={styles.gridContainer}>
           {specialties.map((item) => {
-            const keys = ['general_internal', 'pediatrics', 'obstetrics', 'musculoskeletal', 'cardiology', 'neurology', 'dermatology', 'imaging'];
-            const nameKey = keys[item.id - 1];
+            // Trước đây tính nameKey qua 1 mảng "keys" RIÊNG chỉ có 8 phần tử, đánh index theo
+            // item.id - 1 — trong khi mỗi item.nameKey đã có sẵn đúng key rồi. Với 3 chuyên khoa mới
+            // (id 9,10,11), mảng "keys" tràn chỉ số → t(undefined) → không hiện chữ dưới icon.
+            const nameKey = item.nameKey;
             return (
               <Pressable
                 key={item.id}
@@ -367,7 +372,7 @@ const HomeScreen = ({ navigation }: any) => {
                   activeOpacity={0.8}
                   onPress={() => {
                     if (item.type === 'doctor') {
-                      navigation.navigate('Booking', { doctorName: item.name, specialty: item.detail });
+                      navigation.navigate('Booking', { doctorId: item.doctorId, doctorName: item.name, specialty: item.detail });
                     } else if (item.type === 'package') {
                       navigation.navigate('Packages');
                     } else {
@@ -420,8 +425,9 @@ const HomeScreen = ({ navigation }: any) => {
         {/* ── Services Grid ── */}
         <View style={styles.gridContainer}>
           {services.map((item) => {
-            const keys = ['test_results', 'receipts', 'info_guide', 'medical_info'];
-            const nameKey = keys[item.id - 1];
+            // Cùng anti-pattern với lưới chuyên khoa (mảng "keys" riêng, dễ tràn chỉ số nếu thêm mục
+            // mới) — dùng thẳng item.nameKey đã có sẵn.
+            const nameKey = item.nameKey;
             return (
               <Pressable
                 key={item.id}

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import { apiFamilyMembers, clearApiCache } from '../services/apiService';
 import { clearBiometricToken } from '../services/biometricService';
+import { connectNotificationHub, disconnectNotificationHub } from '../services/signalrService';
 
 export type VerificationStatus = 'pending' | 'verified' | 'rejected';
 
@@ -46,13 +47,15 @@ export interface RecentServiceItem {
   type: 'doctor' | 'specialty' | 'package';
   doctorName?: string;
   specialtyName?: string;
+  doctorId?: number;
+  specialtyId?: number;
 }
 
-const INITIAL_RECENT_SERVICES: RecentServiceItem[] = [
-  { id: '1', name: 'BS. Nguyễn Văn A', detail: 'Nội tổng quát', time: 'Khám gần nhất: 15/05', icon: 'stethoscope', type: 'doctor', doctorName: 'BS. Nguyễn Văn A', specialtyName: 'Nội tổng quát' },
-  { id: '2', name: 'Nhi khoa', detail: 'BS. Lê Thị B', time: 'Khám gần nhất: 21/07', icon: 'baby', type: 'specialty', specialtyName: 'Nhi khoa' },
-  { id: '3', name: 'Gói Khám Nam', detail: 'DTT Healthcare', time: 'Đã lưu', icon: 'medkit', type: 'package' },
-];
+// Trước đây có sẵn 3 mục demo (BS. Nguyễn Văn A, Nhi khoa, Gói Khám Nam) hiện ra ngay cả khi người
+// dùng CHƯA từng tương tác gì — nhìn như dữ liệu lịch sử thật nhưng thực chất là hàng giả/ngẫu nhiên
+// (đúng như QA report "Đã dùng gần đây như là đang để random"). Để trống, giống PLACEHOLDER_PROFILES ở
+// trên, cho tới khi addRecentService() ghi nhận tương tác thật — HomeScreen đã tự ẩn cả section khi rỗng.
+const INITIAL_RECENT_SERVICES: RecentServiceItem[] = [];
 
 export interface User {
   token?: string;
@@ -78,6 +81,9 @@ interface AuthContextType {
   deleteProfile: (id: string) => void;
   recentServices: RecentServiceItem[];
   addRecentService: (item: Omit<RecentServiceItem, 'id' | 'time'> & { time?: string }) => void;
+  // Tăng dần mỗi khi Hub báo "NotificationsChanged" — màn nào cần tự làm mới danh sách/badge
+  // thông báo real-time chỉ cần useEffect theo dõi giá trị này (xem NotificationScreen.tsx).
+  notificationsTick: number;
 }
 
 // Placeholder trước khi đăng nhập (xem PLACEHOLDER_PROFILES ở trên) — patientId=0 là sentinel
@@ -104,6 +110,7 @@ const AuthContext = createContext<AuthContextType>({
   deleteProfile: () => {},
   recentServices: [],
   addRecentService: () => {},
+  notificationsTick: 0,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -111,6 +118,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isVerified, setIsVerified] = useState(false);
   const [profiles, setProfiles] = useState<PatientProfile[]>(PLACEHOLDER_PROFILES);
   const [recentServices, setRecentServices] = useState<RecentServiceItem[]>(INITIAL_RECENT_SERVICES);
+  const [notificationsTick, setNotificationsTick] = useState(0);
+
+  // Kết nối SignalR khi có phiên đăng nhập hợp lệ (patientId > 0), ngắt khi logout — AppNavigator
+  // luôn khởi động ở màn Login (không tự khôi phục phiên cũ) nên hiệu ứng này bao quát đủ mọi luồng
+  // đăng nhập (mật khẩu/Face ID/OTP), vì tất cả đều đi qua login() cập nhật currentUser.
+  useEffect(() => {
+    if (currentUser?.patientId) {
+      connectNotificationHub({
+        onNotificationsChanged: () => setNotificationsTick(t => t + 1),
+        onVerificationStatusChanged: (data) => {
+          setIsVerified(data.verificationStatus === 'verified');
+        },
+      });
+    } else {
+      disconnectNotificationHub();
+    }
+    return () => { disconnectNotificationHub(); };
+  }, [currentUser?.patientId]);
 
   // Load patient profiles from backend DB whenever patientId changes
   useEffect(() => {
@@ -298,8 +323,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<AuthContextType>(() => ({
     currentUser, setCurrentUser, login, logout,
     isVerified, setIsVerified, profiles, addProfile, updateProfile, deleteProfile,
-    recentServices, addRecentService
-  }), [currentUser, login, logout, isVerified, profiles, addProfile, updateProfile, deleteProfile, recentServices, addRecentService]);
+    recentServices, addRecentService, notificationsTick
+  }), [currentUser, login, logout, isVerified, profiles, addProfile, updateProfile, deleteProfile, recentServices, addRecentService, notificationsTick]);
 
   return (
     <AuthContext.Provider value={value}>
