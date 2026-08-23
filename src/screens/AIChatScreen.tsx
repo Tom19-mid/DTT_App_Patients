@@ -238,9 +238,10 @@ const AIChatScreen = ({ navigation }: any) => {
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       ) : (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} keyboardVerticalOffset={90}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={90}>
           <FlatList
             ref={listRef}
+            style={{ flex: 1 }}
             data={messages}
             keyExtractor={(item) => String(item.messageId)}
             renderItem={renderBubble}

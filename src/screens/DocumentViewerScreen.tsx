@@ -26,19 +26,27 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
     patientName: 'Nguyễn Văn Bệnh Nhân'
   };
 
-  const actualPatientName = recordData?.patientName || patientName || 'Nguyễn Văn Bệnh Nhân';
-  const actualDoctorName = recordData?.doctor || 'BS. CKII PHẠM TUẤN KIỆT';
-  const actualCode = recordData?.code || 'PK-20260726-001';
-  const actualDiagnosis = recordData?.diagnosis || 'Khám sức khỏe tổng quát';
-  const actualSymptoms = recordData?.symptoms || 'Khám định kỳ';
-  const actualTreatment = recordData?.treatmentPlan || 'Nghỉ ngơi nhiều, cấp toa thuốc về nhà theo dõi thêm.';
-  
-  const bp = recordData?.bloodPressure ? `Huyết áp: ${recordData.bloodPressure}` : 'Huyết áp: 120/80 mmHg';
-  const pulse = recordData?.heartRate ? `Mạch: ${recordData.heartRate} bpm` : 'Mạch: 80 bpm';
-  const temp = recordData?.temperature ? `Thân nhiệt: ${recordData.temperature}°C` : 'Thân nhiệt: 36.8°C';
+  // hasRecord=true nghĩa là màn này được mở với 1 hồ sơ THẬT (recordData truyền từ API) — mọi field
+  // rỗng lúc đó phải hiện "Chưa có dữ liệu" trung thực, KHÔNG được điền dữ liệu demo bịa ra như thể là
+  // thật (trước đây field nào cũng có 1 giá trị giả cụ thể — vd đơn thuốc thật rỗng vẫn tự bịa ra
+  // "Amoxicillin 500mg" như thể bác sĩ đã kê, bệnh nhân có thể tưởng nhầm là thuốc thật của mình).
+  // Dữ liệu demo cụ thể CHỈ còn dùng khi mở màn này hoàn toàn không có recordData (xem preview/test).
+  const hasRecord = !!recordData;
+  const actualPatientName = recordData?.patientName || patientName || (hasRecord ? 'Chưa có tên bệnh nhân' : 'Nguyễn Văn Bệnh Nhân');
+  const actualDoctorName = recordData?.doctor || (hasRecord ? 'Chưa có thông tin bác sĩ' : 'BS. CKII PHẠM TUẤN KIỆT');
+  const actualCode = recordData?.code || (hasRecord ? '—' : 'PK-20260726-001');
+  const actualDiagnosis = recordData?.diagnosis || (hasRecord ? 'Chưa có chẩn đoán' : 'Khám sức khỏe tổng quát');
+  const actualSymptoms = recordData?.symptoms || (hasRecord ? 'Chưa ghi nhận triệu chứng' : 'Khám định kỳ');
+  const actualTreatment = recordData?.treatmentPlan || (hasRecord ? 'Chưa có hướng điều trị' : 'Nghỉ ngơi nhiều, cấp toa thuốc về nhà theo dõi thêm.');
 
-  const actualPrescriptions = recordData?.prescriptionItems && recordData.prescriptionItems.length > 0 
-    ? recordData.prescriptionItems 
+  const bp = recordData?.bloodPressure ? `Huyết áp: ${recordData.bloodPressure}` : (hasRecord ? 'Huyết áp: Chưa đo' : 'Huyết áp: 120/80 mmHg');
+  const pulse = recordData?.heartRate ? `Mạch: ${recordData.heartRate} bpm` : (hasRecord ? 'Mạch: Chưa đo' : 'Mạch: 80 bpm');
+  const temp = recordData?.temperature ? `Thân nhiệt: ${recordData.temperature}°C` : (hasRecord ? 'Thân nhiệt: Chưa đo' : 'Thân nhiệt: 36.8°C');
+
+  const actualPrescriptions = recordData?.prescriptionItems && recordData.prescriptionItems.length > 0
+    ? recordData.prescriptionItems
+    : hasRecord
+    ? []
     : [
         { name: 'Amoxicillin 500mg', usage: 'Số lượng: 20 Viên. Uống ngày 2 lần, mỗi lần 1 viên sau ăn.' },
         { name: 'Paracetamol 500mg', usage: 'Số lượng: 10 Viên. Uống khi sốt cao > 38.5°C' }
@@ -90,12 +98,16 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
               {docType === 'toa-thuoc' ? (
                 <>
                   <Text style={styles.bold}>CHỈ ĐỊNH ĐIỀU TRỊ / ĐƠN THUỐC:</Text>
-                  {actualPrescriptions.map((item: any, index: number) => (
-                    <View key={index} style={styles.prescriptionItem}>
-                      <Text style={styles.itemTitle}>{index + 1}. {item.name}</Text>
-                      <Text style={styles.itemUsage}>{item.usage}</Text>
-                    </View>
-                  ))}
+                  {actualPrescriptions.length === 0 ? (
+                    <Text style={styles.itemUsage}>Chưa có đơn thuốc nào được kê cho lần khám này.</Text>
+                  ) : (
+                    actualPrescriptions.map((item: any, index: number) => (
+                      <View key={index} style={styles.prescriptionItem}>
+                        <Text style={styles.itemTitle}>{index + 1}. {item.name}</Text>
+                        <Text style={styles.itemUsage}>{item.usage}</Text>
+                      </View>
+                    ))
+                  )}
                   <Text style={styles.note}><Text style={styles.bold}>Lời dặn:</Text> {actualTreatment}</Text>
                 </>
               ) : docType === 'xet-nghiem' ? (

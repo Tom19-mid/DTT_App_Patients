@@ -15,7 +15,7 @@ const NotificationScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const { currentUser, isVerified } = useAuth();
+  const { currentUser, isVerified, notificationsTick } = useAuth();
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();
 
@@ -43,6 +43,11 @@ const NotificationScreen = ({ navigation }: any) => {
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  // Real-time: Hub báo có thông báo mới (vd Admin vừa phát) — làm mới ngay không cần người dùng tự kéo refresh.
+  useEffect(() => {
+    if (notificationsTick > 0) fetchNotifications(true);
+  }, [notificationsTick, fetchNotifications]);
 
   const onRefresh = () => {
     setRefreshing(true);

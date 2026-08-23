@@ -50,13 +50,18 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
           const slotsToday = sched?.today?.isWorking ? sched.today.timeSlots : [];
           const slotsTomorrow = sched?.tomorrow?.isWorking ? sched.tomorrow.timeSlots : [];
 
+          // Tránh lặp "Bác sĩ Bác sĩ ..." khi full_name trong DB đã tự có sẵn tiền tố "Bác sĩ"/"BS."
+          // (vd dữ liệu test "Bác sĩ C", "Bác sĩ Tân") — trước đây luôn nối cứng "Bác sĩ " phía trước.
+          const rawName = d.fullName || 'Bác sĩ DTT';
+          const displayName = /^(bác sĩ|bs\.?)\s/i.test(rawName.trim()) ? rawName.trim() : `Bác sĩ ${rawName}`;
+
           return {
             id: d.doctorId,
             name: d.fullName || 'Bác sĩ DTT',
             title: d.degree || 'ThS. Bác sĩ',
             rating: d.rating || 5.0,
             reviews: d.reviewCount || 10,
-            bio: `Bác sĩ ${d.fullName || ''} có ${d.experienceYears || 10} năm kinh nghiệm công tác tại ${d.clinicRoom || 'Phòng khám'}.\n• Lịch trực thường niên: ${d.workingDaysText || 'Thứ Hai đến Thứ Bảy'}.\n• Chuyên sâu khám và tư vấn điều trị các bệnh lý ${specialty.name || 'chuyên khoa'}.`,
+            bio: `${displayName} có ${d.experienceYears || 10} năm kinh nghiệm công tác tại ${d.clinicRoom || 'Phòng khám'}.\n• Lịch trực thường niên: ${d.workingDaysText || 'Thứ Hai đến Thứ Bảy'}.\n• Chuyên sâu khám và tư vấn điều trị các bệnh lý ${specialty.name || 'chuyên khoa'}.`,
             schedule: [
               { dateLabel: `Hôm nay, ${toDisplayDateStr(today)}`, dateValue: toDisplayDateStr(today), slots: slotsToday },
               { dateLabel: `Ngày mai, ${toDisplayDateStr(tomorrow)}`, dateValue: toDisplayDateStr(tomorrow), slots: slotsTomorrow }
@@ -69,10 +74,12 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
       }
     } catch (error) {
       console.log('Error fetching doctors from API:', error);
-      // Fallback
+      // Fallback khi API lỗi — id ÂM (không trùng bất kỳ doctorId thật nào, luôn >= 1) để nếu người
+      // dùng lỡ bấm đặt lịch với "bác sĩ" giả này, backend từ chối rõ ràng ("không tìm thấy bác sĩ")
+      // thay vì trước đây id=1/2 trùng NGẪU NHIÊN với 2 bác sĩ thật, âm thầm đặt nhầm lịch cho họ.
       setDoctors([
         {
-          id: 1,
+          id: -1,
           name: 'BS. CK1 Nguyễn Văn A',
           title: 'Chuyên khoa I Nội tổng quát',
           rating: 4.9,
@@ -81,7 +88,7 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
           schedule: MOCK_SCHEDULE
         },
         {
-          id: 2,
+          id: -2,
           name: 'BS. CKI Lê Thị B',
           title: 'Bác sĩ Chuyên khoa Nhi',
           rating: 5.0,
@@ -172,6 +179,7 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
                               style={[styles.timeSlotBtn, SHADOWS.input]}
                               onPress={() => {
                                 navigation.navigate('ConfirmBooking', {
+                                  doctorId: doc.id,
                                   doctorName: `${doc.title} ${doc.name}`,
                                   specialtyName: specialty.name,
                                   date: day.dateValue,

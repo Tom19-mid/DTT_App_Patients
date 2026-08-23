@@ -20,6 +20,26 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
   const { showAlert } = useCustomAlert();
 
   const handleConfirm = async () => {
+    // type === 'doctor' phải có doctorId thật — trước đây fallback `doctorId || 1` âm thầm đặt lịch
+    // với Bác sĩ #1 bất kể bệnh nhân chọn ai, nếu màn trước đó (vd: "Đã dùng gần đây") lỡ không
+    // truyền doctorId qua route params.
+    if (type === 'doctor' && !doctorId) {
+      showAlert({
+        title: 'Thiếu thông tin bác sĩ',
+        message: 'Không xác định được bác sĩ cần đặt lịch. Vui lòng quay lại và chọn bác sĩ/khung giờ lại.',
+        type: 'error',
+      });
+      return;
+    }
+    if (!date) {
+      showAlert({
+        title: 'Thiếu ngày khám',
+        message: 'Không xác định được ngày khám. Vui lòng quay lại và chọn lại khung giờ.',
+        type: 'error',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Connect to Backend ASP.NET Core API -> PostgreSQL Server
@@ -33,10 +53,10 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
       } else {
         res = await apiAppointment.createAppointment({
           patientId: currentUser?.patientId,
-          doctorId: doctorId || 1,
+          doctorId,
           doctorName: doctorName || 'BS. CK1 Nguyễn Văn A',
           specialtyName: finalSpecialty,
-          date: date || '26/07/2026',
+          date,
           timeSlot: finalTime,
           fee: finalPrice
         });
@@ -53,6 +73,8 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
           type: 'doctor',
           doctorName,
           specialtyName: specialty,
+          doctorId,
+          specialtyId,
         });
       } else {
         addRecentService({

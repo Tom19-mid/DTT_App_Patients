@@ -62,12 +62,46 @@ const DOCTORS = [
   },
 ];
 
+// Icon dự phòng theo từ khóa tên chuyên khoa — chỉ dùng để chọn icon hiển thị, KHÔNG dùng để xác
+// định specialtyId (specialtyId giờ lấy trực tiếp từ API, xem apiSpecialties bên dưới).
+const iconForSpecialtyName = (name: string): string => {
+  const s = name.toLowerCase();
+  if (s.includes('nội') || s.includes('general')) return 'stethoscope';
+  if (s.includes('nhi') || s.includes('pediatric')) return 'baby';
+  if (s.includes('phụ') || s.includes('sản') || s.includes('obstetric')) return 'female';
+  if (s.includes('cơ') || s.includes('xương') || s.includes('khớp')) return 'bone';
+  if (s.includes('tim') || s.includes('cardi')) return 'heartbeat';
+  if (s.includes('thần') || s.includes('neurology')) return 'brain';
+  if (s.includes('da') || s.includes('dermatology')) return 'hand-sparkles';
+  if (s.includes('hình') || s.includes('imaging') || s.includes('chẩn đoán')) return 'x-ray';
+  if (s.includes('răng') || s.includes('hàm') || s.includes('mặt') || s.includes('dental')) return 'tooth';
+  if (s.includes('tai') || s.includes('mũi') || s.includes('họng') || s.includes('ent')) return 'deaf';
+  if (s.includes('mắt') || s.includes('eye')) return 'eye';
+  return 'notes-medical';
+};
+
 const BookingScreen = ({ route, navigation }: any) => {
   const { isDarkMode, t } = useSettings();
   const initialSpecialty = route.params?.specialty || route.params?.specialtyName || t('specialties');
+  const requestedDoctorId: number | undefined = route.params?.doctorId || undefined;
   const [expandedId, setExpandedId] = useState<number | null>(route.params?.doctorId || 3);
   const [isSpecialtyModalVisible, setSpecialtyModalVisible] = useState(false);
   const [selectedSpecialty, setSelectedSpecialty] = useState(initialSpecialty);
+  // Danh sách chuyên khoa thật từ DB (trước đây modal chọn chuyên khoa dùng mảng SPECIALTIES hardcode
+  // chỉ 7 mục — các chuyên khoa thêm sau qua Web Admin như Răng hàm mặt/Tai-Mũi-Họng/Mắt không hề
+  // xuất hiện để chọn, đúng như report "chuyên khoa hiển thị không đúng trong database").
+  const [apiSpecialties, setApiSpecialties] = useState<Array<{ specialtyId: number; name: string; icon: string }>>([]);
+  const [selectedSpecialtyId, setSelectedSpecialtyId] = useState<number | undefined>(route.params?.specialtyId || undefined);
+
+  useEffect(() => {
+    apiMedical.getSpecialties()
+      .then((list: any[]) => {
+        if (Array.isArray(list) && list.length > 0) {
+          setApiSpecialties(list.map(s => ({ specialtyId: s.specialtyId, name: s.specialtyName, icon: iconForSpecialtyName(s.specialtyName) })));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Calendar State
   const tomorrow = new Date();
@@ -147,8 +181,16 @@ const BookingScreen = ({ route, navigation }: any) => {
   const [doctorSchedules, setDoctorSchedules] = useState<any[]>([]);
   const [schedulesLoading, setSchedulesLoading] = useState(false);
 
+  // Fallback khi màn hình được mở bằng tên chuyên khoa dạng chuỗi tự do (route params từ màn khác,
+  // vd AI Chat gợi ý chuyên khoa) mà chưa có specialtyId cụ thể — ưu tiên khớp đúng tên với danh sách
+  // thật từ API trước, chỉ heuristic theo từ khóa khi không khớp được (vd trước khi API load xong).
   const getSpecialtyId = (specialty: string): number | undefined => {
-    const s = specialty.toLowerCase();
+    const s = specialty.toLowerCase().trim();
+    const exactMatch = apiSpecialties.find(sp => sp.name.toLowerCase().trim() === s);
+    if (exactMatch) return exactMatch.specialtyId;
+    const partialMatch = apiSpecialties.find(sp => sp.name.toLowerCase().includes(s) || s.includes(sp.name.toLowerCase()));
+    if (partialMatch) return partialMatch.specialtyId;
+
     if (s.includes('nội') || s.includes('general')) return 1;
     if (s.includes('nhi') || s.includes('pediatric')) return 2;
     if (s.includes('phụ') || s.includes('sản') || s.includes('obstetric')) return 3;
@@ -157,20 +199,27 @@ const BookingScreen = ({ route, navigation }: any) => {
     if (s.includes('thần') || s.includes('neurology')) return 6;
     if (s.includes('da') || s.includes('dermatology')) return 7;
     if (s.includes('hình') || s.includes('imaging')) return 8;
+    if (s.includes('răng') || s.includes('hàm') || s.includes('dental')) return 9;
+    if (s.includes('tai') || s.includes('mũi') || s.includes('họng') || s.includes('ent')) return 10;
+    if (s.includes('mắt') || s.includes('eye')) return 11;
     return undefined;
   };
 
   useEffect(() => {
     // Clear stale schedules immediately when specialty/date changes to avoid showing wrong doctors
     setDoctorSchedules([]);
-    const specId = getSpecialtyId(selectedSpecialty);
-    // Only fetch if a specific specialty is selected
-    if (specId !== undefined) {
+    // Ưu tiên specialtyId đã chọn trực tiếp từ modal/API (selectedSpecialtyId); chỉ suy luận qua tên
+    // khi mở màn bằng route params dạng chuỗi (vd từ AI Chat) chưa kèm sẵn ID.
+    const specId = selectedSpecialtyId ?? getSpecialtyId(selectedSpecialty);
+    // Only fetch if a specific specialty is selected, or a specific doctor was requested
+    // (vd: mở từ "Đã dùng gần đây" trên Home — trước đây doctorId bị bỏ qua hoàn toàn ở đây nên
+    // "đặt theo bác sĩ" hiện y hệt danh sách "đặt theo chuyên khoa", không lọc còn 1 bác sĩ).
+    if (specId !== undefined || requestedDoctorId !== undefined) {
       fetchApiSchedules(specId);
     }
-  }, [selectedSpecialty, selectedDate]);
+  }, [selectedSpecialty, selectedSpecialtyId, selectedDate, requestedDoctorId, apiSpecialties]);
 
-  const fetchApiSchedules = async (specId: number) => {
+  const fetchApiSchedules = async (specId?: number) => {
     try {
       setSchedulesLoading(true);
       const dateStr = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
@@ -179,14 +228,14 @@ const BookingScreen = ({ route, navigation }: any) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
 
-      const schedules = await apiMedical.getDoctorSchedules(undefined, specId, dateStr);
+      const schedules = await apiMedical.getDoctorSchedules(requestedDoctorId, specId, dateStr);
       clearTimeout(timeout);
 
       if (schedules && schedules.length > 0) {
         // Extra filter: ensure only doctors for this specialty are shown
-        const filtered = schedules.filter((s: any) =>
-          !s.specialtyId || s.specialtyId === specId
-        );
+        const filtered = specId !== undefined
+          ? schedules.filter((s: any) => !s.specialtyId || s.specialtyId === specId)
+          : schedules;
         setDoctorSchedules(filtered.length > 0 ? filtered : schedules);
       } else {
         setDoctorSchedules([]);
@@ -330,7 +379,7 @@ const BookingScreen = ({ route, navigation }: any) => {
                 Đang tải danh sách bác sĩ...
               </Text>
             </View>
-          ) : currentDoctors.length === 0 && getSpecialtyId(selectedSpecialty) === undefined ? (
+          ) : currentDoctors.length === 0 && selectedSpecialtyId === undefined && getSpecialtyId(selectedSpecialty) === undefined && requestedDoctorId === undefined ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <Ionicons name="medkit-outline" size={48} color="#D0D0D0" />
               <Text style={{ marginTop: 12, color: COLORS.placeholder, textAlign: 'center', fontSize: 14 }}>
@@ -445,18 +494,19 @@ const BookingScreen = ({ route, navigation }: any) => {
             </View>
 
             <FlatList
-              data={SPECIALTIES}
-              keyExtractor={(item) => item.name}
+              data={apiSpecialties.length > 0 ? apiSpecialties : SPECIALTIES}
+              keyExtractor={(item: any) => item.specialtyId ? String(item.specialtyId) : item.name}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.specialtyListContent}
               renderItem={({ item }) => {
                 const isSelected = selectedSpecialty === item.name;
                 return (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.specialtyOption, isSelected && styles.specialtyOptionActive]}
                     activeOpacity={0.7}
                     onPress={() => {
                       setSelectedSpecialty(item.name);
+                      setSelectedSpecialtyId((item as any).specialtyId);
                       setSpecialtyModalVisible(false);
                     }}
                   >

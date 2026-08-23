@@ -25,15 +25,21 @@ interface GlobalSearchModalProps {
 }
 
 // ── Static Master Data & Fallbacks ─────────────────────────────────────────────
+// Trước đây chỉ có 8/11 chuyên khoa — thiếu Răng hàm mặt/Tai-Mũi-Họng/Mắt, nên bác sĩ thuộc 3 khoa
+// này khi bấm từ kết quả tìm kiếm bị rơi về nhãn chung chung "Chuyên môn Y khoa" (SPECIALTIES_MASTER.find
+// trả về undefined). Tên "Sản phụ khoa" (id 3) sửa lại khớp đúng tên thật trong DB (trước ghi "Phụ & Sản khoa").
 const SPECIALTIES_MASTER = [
   { id: 1, name: 'Nội Tổng quát', icon: 'stethoscope', type: 'fa5', desc: 'Khám nội tiết, tim mạch cơ bản, tiêu hóa' },
   { id: 2, name: 'Nhi khoa', icon: 'baby', type: 'fa5', desc: 'Khám & điều trị chuyên sâu cho bé' },
-  { id: 3, name: 'Phụ & Sản khoa', icon: 'human-female', type: 'mci', desc: 'Chăm sóc sức khỏe thai sản, phụ khoa' },
+  { id: 3, name: 'Sản phụ khoa', icon: 'human-female', type: 'mci', desc: 'Chăm sóc sức khỏe thai sản, phụ khoa' },
   { id: 4, name: 'Cơ xương khớp', icon: 'bone', type: 'fa5', desc: 'Khám thần kinh cột sống, loãng xương, chấn thương' },
   { id: 5, name: 'Tim mạch', icon: 'heartbeat', type: 'fa5', desc: 'Siêu âm tim, đo điện tim, điều trị tăng huyết áp' },
   { id: 6, name: 'Thần kinh', icon: 'brain', type: 'fa5', desc: 'Khám đau đầu, mất ngủ, thần kinh ngoại biên' },
   { id: 7, name: 'Da liễu', icon: 'hand-sparkles', type: 'fa5', desc: 'Điều trị viêm da, dị ứng, mẫn ngứa chấn thương da' },
   { id: 8, name: 'Chẩn đoán hình ảnh', icon: 'bullseye', type: 'fa5', desc: 'Chụp X-Quang, CT, MRI công nghệ cao' },
+  { id: 9, name: 'Răng hàm mặt', icon: 'tooth', type: 'fa5', desc: 'Khám và điều trị các bệnh lý về răng, hàm, mặt' },
+  { id: 10, name: 'Tai-Mũi-Họng', icon: 'deaf', type: 'fa5', desc: 'Khám và điều trị các bệnh lý về tai, mũi và họng' },
+  { id: 11, name: 'Mắt', icon: 'eye', type: 'fa5', desc: 'Khám, chẩn đoán và điều trị các bệnh lý về mắt' },
 ];
 
 const PACKAGES_MASTER = [
@@ -226,7 +232,7 @@ const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ visible, onClose,
               </TouchableOpacity>
             ) : (
               <TouchableOpacity onPress={() => setIsListening(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="mic" size={22} color={COLORS.primary} />
+                <Ionicons name="flash" size={22} color={COLORS.primary} />
               </TouchableOpacity>
             )}
           </View>
@@ -419,16 +425,18 @@ const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ visible, onClose,
           )}
         </ScrollView>
 
-        {/* ── Voice Recognition Simulation Overlay ── */}
+        {/* ── Quick Search Suggestions (KHÔNG phải nhận diện giọng nói thật — trước đây UI này giả vờ
+            "Đang Lắng Nghe..." khiến người dùng tưởng có thể nói vào mic thật, nhưng chỉ là các gợi ý
+            tìm kiếm dựng sẵn. Đổi lại thành gợi ý tìm kiếm nhanh, trung thực, không giả lập mic). ── */}
         {isListening && (
           <View style={styles.voiceOverlay}>
             <View style={[styles.voiceDialog, isDarkMode && { backgroundColor: '#1F2937', borderColor: '#374151' }]}>
               <View style={styles.micPulseCircle}>
-                <Ionicons name="mic" size={38} color="#FFFFFF" />
+                <Ionicons name="search" size={38} color="#FFFFFF" />
               </View>
-              <Text style={[styles.voiceTitle, isDarkMode && { color: '#F3F4F6' }]}>Đang Lắng Nghe...</Text>
+              <Text style={[styles.voiceTitle, isDarkMode && { color: '#F3F4F6' }]}>Gợi ý tìm kiếm nhanh</Text>
               <Text style={[styles.voiceSub, isDarkMode && { color: '#9CA3AF' }]}>
-                Hãy nói tên Bác sĩ, chuyên khoa hoặc dịch vụ bạn muốn tìm (hoặc chạm vào mẫu giọng nói thử nghiệm bên dưới):
+                Tính năng tìm kiếm bằng giọng nói đang được phát triển. Trong lúc chờ, bạn có thể chạm chọn nhanh 1 gợi ý bên dưới:
               </Text>
 
               <View style={styles.voiceChipsContainer}>

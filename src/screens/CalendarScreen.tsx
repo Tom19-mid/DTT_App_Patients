@@ -10,6 +10,8 @@ import { apiAppointment, clearApiCache, PatientAppointmentDto } from '../service
 import { useAuth } from '../context/AuthContext';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+// Trước đây chỉ có 7/11 chuyên khoa — thiếu Chẩn đoán hình ảnh/Răng hàm mặt/Tai-Mũi-Họng/Mắt,
+// khiến không lọc/đặt lịch được cho 4 khoa này từ màn Lịch khám.
 const SPECIALTIES = [
   { nameKey: 'general_internal', icon: 'stethoscope' },
   { nameKey: 'pediatrics', icon: 'baby' },
@@ -18,6 +20,10 @@ const SPECIALTIES = [
   { nameKey: 'cardiology', icon: 'heartbeat' },
   { nameKey: 'neurology', icon: 'brain' },
   { nameKey: 'dermatology', icon: 'hand-sparkles' },
+  { nameKey: 'imaging', icon: 'x-ray' },
+  { nameKey: 'dentistry', icon: 'tooth' },
+  { nameKey: 'otolaryngology', icon: 'deaf' },
+  { nameKey: 'ophthalmology', icon: 'eye' },
 ];
 
 // --- Helper Functions for Calendar ---
@@ -107,14 +113,23 @@ const CalendarScreen = ({ navigation }: any) => {
         if (timeMatch && timeMatch[1]) timeStr = timeMatch[1];
       }
 
-      // Fallback identification for specialty if still missing or generic
+      // Fallback identification for specialty if still missing or generic — trước đây chỉ đối chiếu
+      // 2/11 tên chuyên khoa (Cơ xương khớp, Nội tổng quát), các khoa còn lại luôn rơi về nhãn chung
+      // chung "Khám chuyên khoa" dù reason có nhắc rõ tên khoa.
       if (!specialty || specialty === 'Khám tổng quát') {
-        if (app.reason && app.reason.includes('Cơ xương khớp')) specialty = 'Cơ xương khớp';
-        else if (app.reason && app.reason.includes('Nội tổng quát')) specialty = 'Nội tổng quát';
-        else specialty = specialty || 'Khám chuyên khoa';
+        const knownSpecialties = [
+          'Nội tổng quát', 'Nhi khoa', 'Sản phụ khoa', 'Cơ xương khớp', 'Tim mạch',
+          'Thần kinh', 'Da liễu', 'Chẩn đoán hình ảnh', 'Răng hàm mặt', 'Tai-Mũi-Họng', 'Mắt',
+        ];
+        const matched = app.reason ? knownSpecialties.find(s => app.reason!.includes(s)) : undefined;
+        specialty = matched || specialty || 'Khám chuyên khoa';
       }
 
-      const isPkg = app.isPackage || app.specialtyName === 'Gói Khám Sức Khỏe' || app.doctorName === 'Gói Khám Sức Khỏe' || (app.reason && (app.reason.includes('Tầm soát') || app.reason.includes('Khám Tổng Quát') || app.reason.includes('Gói khám'))) || false;
+      // Trước đây đoán gói khám qua app.reason.includes('Tầm soát'/'Khám Tổng Quát') — 1 lịch khám
+      // THƯỜNG với bác sĩ mà lý do khám tình cờ chứa các cụm này sẽ bị hiện NHẦM thành gói khám (ẩn
+      // mất tên bác sĩ thật). doctorName === '' mới là tín hiệu THẬT — backend chỉ để trống tên bác sĩ
+      // đúng lúc AppointmentsController.cs xác định đây thật sự là gói khám (qua Note "Gói khám: ").
+      const isPkg = app.isPackage || app.doctorName === '' || false;
 
       // Clean doctor name - extract only the name part (remove degree prefix if it contains specialty info)
       let doctor = app.doctorName || '';
