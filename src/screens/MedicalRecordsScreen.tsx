@@ -46,13 +46,33 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
     try {
       const res = await apiMedicalRecords.getByPatient(currentUser.patientId);
       if (res) {
-        setRecordsData({
-          'phieu-kham': res.phieu_kham || [],
-          'toa-thuoc': res.toa_thuoc || [],
-          'xet-nghiem': res.xet_nghiem || [],
-          'sieu-am': res.sieu_am || [],
-          'hoa-don': res.hoa_don || [],
-        });
+        // [Old code - Chỉ nhận object phân loại sẵn]:
+        // setRecordsData({
+        //   'phieu-kham': res.phieu_kham || [],
+        //   'toa-thuoc': res.toa_thuoc || [],
+        //   'xet-nghiem': res.xet_nghiem || [],
+        //   'sieu-am': res.sieu_am || [],
+        //   'hoa-don': res.hoa_don || [],
+        // });
+
+        // [New code - Hỗ trợ cả object phân loại 5 danh mục và fallback nếu backend trả mảng]:
+        if (Array.isArray(res)) {
+          setRecordsData({
+            'phieu-kham': res,
+            'toa-thuoc': [],
+            'xet-nghiem': [],
+            'sieu-am': [],
+            'hoa-don': [],
+          });
+        } else {
+          setRecordsData({
+            'phieu-kham': res.phieu_kham || [],
+            'toa-thuoc': res.toa_thuoc || [],
+            'xet-nghiem': res.xet_nghiem || [],
+            'sieu-am': res.sieu_am || [],
+            'hoa-don': res.hoa_don || [],
+          });
+        }
       }
     } catch (e) {
       console.log('[MedicalRecordsScreen] Error fetching medical records:', e);
@@ -152,10 +172,14 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
                   navigation.navigate('DocumentViewer', {
                     title: TABS.find(t => t.id === activeTab)?.titleKey ? t(TABS.find(t => t.id === activeTab)!.titleKey) : 'Hồ sơ',
                     docType: activeTab, // 'phieu-kham' | 'toa-thuoc' | 'xet-nghiem' | 'sieu-am' | 'hoa-don' — dùng để chọn đúng mẫu hiển thị, không phụ thuộc title đã dịch (dễ vỡ khi đổi ngôn ngữ)
-                    specialty: t(item.clinicKey),
+                    // [Old code]: specialty: t(item.clinicKey),
+                    // [New code]:
+                    specialty: item.specialtyName || (item.clinicKey ? t(item.clinicKey) || item.clinicKey : 'Chuyên khoa'),
                     date: item.date,
                     recordData: item,
-                    patientName: currentUser?.fullName || 'Bệnh nhân'
+                    // [Old code]: patientName: currentUser?.fullName || 'Bệnh nhân'
+                    // [New code]:
+                    patientName: item.patientName || currentUser?.fullName || 'Bệnh nhân'
                   });
                 }}
               >
@@ -173,13 +197,17 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
                   {activeTab === 'phieu-kham' && (
                     <>
                       <Text style={[styles.recordTitle, isDarkMode && { color: '#F3F4F6' }]}>{item.specialtyName || t(item.clinicKey) || item.clinicKey}</Text>
-                      <Text style={[styles.recordSub, isDarkMode && { color: '#9CA3AF' }]}>{item.doctor.replace('BS.', t('dr'))}</Text>
+                      {/* [Old code]: <Text style={[styles.recordSub, isDarkMode && { color: '#9CA3AF' }]}>{item.doctor.replace('BS.', t('dr'))}</Text> */}
+                      {/* [New code]: Safe null navigation */}
+                      <Text style={[styles.recordSub, isDarkMode && { color: '#9CA3AF' }]}>{(item.doctor || 'Bác sĩ').replace('BS.', t('dr'))}</Text>
                     </>
                   )}
                   {activeTab === 'toa-thuoc' && (
                     <>
                       <Text style={[styles.recordTitle, isDarkMode && { color: '#F3F4F6' }]}>{item.items}</Text>
-                      <Text style={[styles.recordSub, isDarkMode && { color: '#9CA3AF' }]}>Kê bởi: {item.doctor.replace('BS.', t('dr'))}</Text>
+                      {/* [Old code]: <Text style={[styles.recordSub, isDarkMode && { color: '#9CA3AF' }]}>Kê bởi: {item.doctor.replace('BS.', t('dr'))}</Text> */}
+                      {/* [New code]: Safe null navigation */}
+                      <Text style={[styles.recordSub, isDarkMode && { color: '#9CA3AF' }]}>Kê bởi: {(item.doctor || 'Bác sĩ').replace('BS.', t('dr'))}</Text>
                     </>
                   )}
                   {activeTab === 'xet-nghiem' && (

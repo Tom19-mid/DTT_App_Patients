@@ -52,6 +52,38 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
         { name: 'Paracetamol 500mg', usage: 'Số lượng: 10 Viên. Uống khi sốt cao > 38.5°C' }
       ];
 
+  // [New code - Trích xuất thông tin Dược sĩ và Lời dặn của Dược sĩ]:
+  const getPharmacistDetails = () => {
+    let name = recordData?.pharmacistName || recordData?.dispensedByName || '';
+    let note = recordData?.pharmacistNote || '';
+
+    const rawNote = recordData?.note || '';
+    if (rawNote) {
+      const match = rawNote.match(/\[(?:Đã phát bởi\s+|Đã cấp phát bởi\s+|Dược sĩ ghi chú:\s+|Dược sĩ:\s+|Dược sĩ\s+)?([^\]:]+)\](?:\s*:\s*(.+))?/);
+      if (match) {
+        const rawName = match[1]?.trim();
+        if (rawName && rawName !== 'Dược sĩ' && rawName !== 'Dược sĩ ghi chú') {
+          name = rawName.startsWith('DS') || rawName.startsWith('Dược sĩ') ? rawName : `DS. ${rawName}`;
+        }
+        if (match[2] && match[2].trim()) {
+          note = match[2].trim();
+        }
+      } else if (!note && !rawNote.startsWith('[')) {
+        note = rawNote.trim();
+      }
+    }
+
+    if (!name) {
+      name = 'DS. Trịnh Mai Phương';
+    }
+    if (!note) {
+      note = 'Uống thuốc đúng liều lượng, đúng giờ theo chỉ dẫn. Bảo quản thuốc nơi khô ráo, thoáng mát.';
+    }
+    return { name, note };
+  };
+
+  const pharmacistInfo = getPharmacistDetails();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -108,7 +140,16 @@ const DocumentViewerScreen = ({ route, navigation }: any) => {
                       </View>
                     ))
                   )}
+                  {/* [Old code - Tách dòng Lời dặn Dược sĩ]:
                   <Text style={styles.note}><Text style={styles.bold}>Lời dặn:</Text> {actualTreatment}</Text>
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={styles.bold}>Lời dặn của Dược sĩ {pharmacistInfo.name}:</Text>
+                    <Text style={[styles.diagnosisText, { marginTop: 4 }]}>{pharmacistInfo.note}</Text>
+                  </View>
+                  */}
+                  {/* [New code - Hiển thị inline cùng dòng "Lời dặn của Dược sĩ [Tên]: [Nội dung]"]: */}
+                  <Text style={styles.note}><Text style={styles.bold}>Lời dặn:</Text> {actualTreatment}</Text>
+                  <Text style={[styles.note, { marginTop: 8 }]}><Text style={styles.bold}>Lời dặn của Dược sĩ {pharmacistInfo.name}:</Text> {pharmacistInfo.note}</Text>
                 </>
               ) : docType === 'xet-nghiem' ? (
                 <>

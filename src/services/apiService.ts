@@ -452,6 +452,7 @@ export const apiHealthPackage = {
       patientId: number;
       patientName: string;
       preferredDate?: string;
+      preferredTimeSlot?: string;
       priceFormatted?: string;
     },
   ) =>
