@@ -149,7 +149,35 @@ const LoginScreen = ({ navigation }: any) => {
       type: 'info',
       confirmText: 'Tiếp tục',
       cancelText: 'Hủy',
-      onConfirm: () => navigation.navigate('OTP', { phone: trimmedPhone }),
+      onConfirm: async () => {
+        try {
+          const data = await apiAuth.sendOtp(trimmedPhone);
+          if (data.success) {
+            if (data.otpCode) {
+              console.log('\n======================================================');
+              console.log(`🔑 [DEMO ĐỒ ÁN TỐT NGHIỆP] MÃ OTP ĐĂNG NHẬP SMS: ${data.otpCode}`);
+              console.log('======================================================\n');
+            }
+            navigation.navigate('OTP', {
+              phone: trimmedPhone,
+              purpose: 'sms_login',
+              otpCode: data.otpCode,
+            });
+          } else {
+            showAlert({
+              title: 'Không thể gửi mã OTP',
+              message: data.message || 'Số điện thoại chưa được đăng ký trong hệ thống.',
+              type: 'error',
+            });
+          }
+        } catch (err: any) {
+          showAlert({
+            title: 'Không thể gửi mã OTP',
+            message: err?.message || 'Số điện thoại chưa được đăng ký trong hệ thống.',
+            type: 'error',
+          });
+        }
+      },
     });
   };
 

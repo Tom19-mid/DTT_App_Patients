@@ -9,18 +9,21 @@ import { useSettings } from '../context/SettingsContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { Ionicons } from '@expo/vector-icons';
 import { apiAuth } from '../services/apiService';
+import { useAuth } from '../context/AuthContext';
 
 /**
- * OTPScreen — Dùng cho 2 luồng:
+ * OTPScreen — Dùng cho 3 luồng:
  *   1. purpose === 'reset_password' → Sau khi xác minh OTP, yêu cầu nhập mật khẩu mới
  *   2. purpose === 'register'       → Sau khi xác minh OTP, chuyển về Login (đăng ký hoàn tất)
+ *   3. purpose === 'sms_login'      → Sau khi xác minh OTP, đăng nhập thẳng vào ứng dụng
  */
 const OTPScreen = ({ navigation, route }: any) => {
   const { isDarkMode, t } = useSettings();
   const { showAlert } = useCustomAlert();
+  const { login } = useAuth();
 
   const phone: string = route?.params?.phone || '';
-  const purpose: 'reset_password' | 'register' = route?.params?.purpose || 'register';
+  const purpose: 'reset_password' | 'register' | 'sms_login' = route?.params?.purpose || 'register';
   const demoOtpCode: string = route?.params?.otpCode || ''; // demo only
   const [currentOtp, setCurrentOtp] = useState(demoOtpCode);
 
@@ -144,6 +147,24 @@ const OTPScreen = ({ navigation, route }: any) => {
         if (purpose === 'reset_password') {
           // Show new password form
           setOtpVerified(true);
+        } else if (purpose === 'sms_login') {
+          if (data.token) {
+            login(data);
+            showAlert({
+              title: 'Đăng nhập thành công',
+              message: `Chào mừng trở lại, ${data.fullName || 'Bệnh nhân'}!`,
+              type: 'success',
+              confirmText: 'Vào ứng dụng',
+              onConfirm: () => navigation.replace('MainTabs'),
+            });
+          } else {
+            showAlert({
+              title: 'Xác thực thành công',
+              message: 'Số điện thoại đã được xác thực. Bạn có thể đăng nhập ngay.',
+              type: 'success',
+              onConfirm: () => navigation.navigate('Login'),
+            });
+          }
         } else {
           // Register flow — OTP confirmed, go to login
           showAlert({
@@ -354,7 +375,7 @@ const OTPScreen = ({ navigation, route }: any) => {
             <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
               <Ionicons name="arrow-back-outline" size={16} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={{ marginRight: 4 }} />
               <Text style={[styles.backText, isDarkMode && { color: '#9CA3AF' }]}>
-                {purpose === 'reset_password' ? 'Quay lại Quên mật khẩu' : 'Quay lại Đăng ký'}
+                {purpose === 'reset_password' ? 'Quay lại Quên mật khẩu' : purpose === 'sms_login' ? 'Quay lại Đăng nhập' : 'Quay lại Đăng ký'}
               </Text>
             </TouchableOpacity>
           </View>

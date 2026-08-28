@@ -298,7 +298,17 @@ export const apiAuth = {
     ),
 
   verifyOtp: (phone: string, otpCode: string) =>
-    request<{ success: boolean; message: string }>("/auth/verify-otp", {
+    request<{
+      success: boolean;
+      message: string;
+      token?: string;
+      userId?: string;
+      patientId?: number;
+      fullName?: string;
+      phone?: string;
+      email?: string;
+      verificationStatus?: string;
+    }>("/auth/verify-otp", {
       method: "POST",
       body: JSON.stringify({ phone, otpCode }),
     }),
