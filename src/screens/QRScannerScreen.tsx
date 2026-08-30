@@ -91,10 +91,10 @@ const QRScannerScreen = ({ navigation, route }: any) => {
                   navigation.replace('DocumentViewer', {
                     document: {
                       id: qrJson.prescriptionId || '101',
-                      title: `Đơn thuốc điện tử - ${qrJson.doctorName || 'BS. CKII Nguyễn Văn A'}`,
+                      title: `Đơn thuốc điện tử - ${qrJson.doctorName || 'Không rõ bác sĩ'}`,
                       date: qrJson.date || '01/08/2026',
                       type: 'Đơn thuốc',
-                      doctor: qrJson.doctorName || 'BS. CKII Nguyễn Văn A',
+                      doctor: qrJson.doctorName || 'Không rõ bác sĩ',
                       clinicKey: 'general_internal',
                       code: `TT-20260801-${qrJson.prescriptionId || '101'}`
                     }

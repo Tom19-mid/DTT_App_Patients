@@ -5,11 +5,6 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { apiMedical } from '../services/apiService';
 
-const MOCK_SCHEDULE = [
-  { dateLabel: 'Hôm nay, 25/07/2026', dateValue: '25/07/2026', slots: ['7:30 - 8:30', '8:30 - 9:30', '13:30 - 14:30'] },
-  { dateLabel: 'Ngày mai, 26/07/2026', dateValue: '26/07/2026', slots: ['8:30 - 9:30', '9:30 - 10:30', '15:00 - 16:00'] }
-];
-
 // yyyy-MM-dd cho API (khớp cách BookingScreen.tsx gọi apiMedical.getDoctorSchedules), và d/M/yyyy để
 // hiển thị + truyền cho ConfirmBooking — tách riêng 2 định dạng cho từng mục đích.
 const toApiDateStr = (d: Date) => `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
@@ -19,6 +14,7 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
   const { specialty } = route.params || { specialty: { name: 'Chuyên khoa', id: undefined } };
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -28,6 +24,7 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
   const fetchDoctors = async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const data = await apiMedical.getDoctors(specialty?.id);
       if (data && data.length > 0) {
         // Trước đây giờ khám là BỊA (isShiftA = doctorId % 2 === 1) dù đã gọi API bác sĩ thật — bệnh
@@ -74,29 +71,11 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
       }
     } catch (error) {
       console.log('Error fetching doctors from API:', error);
-      // Fallback khi API lỗi — id ÂM (không trùng bất kỳ doctorId thật nào, luôn >= 1) để nếu người
-      // dùng lỡ bấm đặt lịch với "bác sĩ" giả này, backend từ chối rõ ràng ("không tìm thấy bác sĩ")
-      // thay vì trước đây id=1/2 trùng NGẪU NHIÊN với 2 bác sĩ thật, âm thầm đặt nhầm lịch cho họ.
-      setDoctors([
-        {
-          id: -1,
-          name: 'BS. CK1 Nguyễn Văn A',
-          title: 'Chuyên khoa I Nội tổng quát',
-          rating: 4.9,
-          reviews: 120,
-          bio: 'Bác sĩ Nguyễn Văn A có hơn 10 năm kinh nghiệm trong lĩnh vực Nội Tổng quát tại bệnh viện.',
-          schedule: MOCK_SCHEDULE
-        },
-        {
-          id: -2,
-          name: 'BS. CKI Lê Thị B',
-          title: 'Bác sĩ Chuyên khoa Nhi',
-          rating: 5.0,
-          reviews: 98,
-          bio: 'Bác sĩ Lê Thị B chuyên chăm sóc sức khỏe và điều trị bệnh lý nhi khoa.',
-          schedule: MOCK_SCHEDULE
-        }
-      ]);
+      // API lỗi — không còn bịa bác sĩ/lịch giả (trước đây dùng id âm + MOCK_SCHEDULE với ngày đã
+      // qua hạn). Theo đúng convention PackagesScreen.tsx: giữ danh sách rỗng, để UI empty-state
+      // bên dưới tự hiển thị (setError để phân biệt "rỗng do lỗi" và hiện thông báo phù hợp).
+      setDoctors([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -128,8 +107,18 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
           </View>
         ) : doctors.length === 0 ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-            <Ionicons name="people-outline" size={48} color={COLORS.placeholder} />
-            <Text style={{ marginTop: 12, color: COLORS.subtext }}>Chưa có bác sĩ thuộc chuyên khoa này.</Text>
+            <Ionicons name={loadError ? "cloud-offline-outline" : "people-outline"} size={48} color={COLORS.placeholder} />
+            <Text style={{ marginTop: 12, color: COLORS.subtext, textAlign: 'center', paddingHorizontal: 24 }}>
+              {loadError
+                ? 'Không thể tải danh sách bác sĩ. Vui lòng kiểm tra kết nối và thử lại.'
+                : 'Chưa có bác sĩ thuộc chuyên khoa này.'}
+            </Text>
+            {loadError && (
+              <TouchableOpacity style={styles.retryBtn} activeOpacity={0.8} onPress={fetchDoctors}>
+                <Ionicons name="refresh" size={16} color="#fff" />
+                <Text style={styles.retryBtnText}>Thử lại</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           doctors.map((doc) => {
@@ -338,6 +327,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.primary,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: COLORS.primary,
+  },
+  retryBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
 });
 

@@ -112,6 +112,15 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
         });
         return;
       }
+      if (!doctorName) {
+        showAlert({
+          title: "Thiếu thông tin bác sĩ",
+          message:
+            "Không xác định được tên bác sĩ cần đặt lịch. Vui lòng quay lại và chọn bác sĩ/khung giờ lại.",
+          type: "error",
+        });
+        return;
+      }
     }
     // 2. Kiểm tra với Gói khám
     else if (type === "package") {
@@ -168,7 +177,7 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
         res = await apiAppointment.createAppointment({
           patientId: currentUser?.patientId,
           doctorId,
-          doctorName: doctorName || "BS. CK1 Nguyễn Văn A",
+          doctorName: doctorName || "Không xác định",
           specialtyName: finalSpecialty,
           date,
           timeSlot: finalTime,
@@ -256,7 +265,7 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
                 />
                 <Text style={styles.infoText}>
                   <Text style={styles.label}>Bác sĩ: </Text>
-                  {doctorName || "BS. CK1 Nguyễn Văn A"}
+                  {doctorName || "Không xác định"}
                 </Text>
               </View>
               <View style={styles.infoRow}>

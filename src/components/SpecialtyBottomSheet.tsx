@@ -96,9 +96,7 @@ const SpecialtyBottomSheet: React.FC<Props> = ({ visible, specialty, onClose }) 
       }
     } catch (e) {
       console.log('Error fetching doctors:', e);
-      setDoctors([
-        { doctorId: -1, fullName: 'BS. CKII Nguyễn Văn A', degree: 'Chuyên khoa I Nội tổng quát', rating: 4.9, reviewCount: 120 },
-      ]);
+      setDoctors([]);
       setWorkingTodayMap({});
     } finally {
       setDoctorLoading(false);

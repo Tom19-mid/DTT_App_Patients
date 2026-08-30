@@ -49,14 +49,6 @@ const PACKAGES_MASTER = [
   { id: 4, title: 'Gói Chuyên Khám & Tầm Soát Tim Mạch', price: '1.800.000đ', booked: '800+', desc: 'Kiểm tra mạch máu, huyết áp, điện tâm đồ chuyên sâu' },
 ];
 
-const DEFAULT_DOCTORS = [
-  { doctorId: 1, fullName: 'BS. CKII Nguyễn Văn A', degree: 'Chuyên khoa II Nội tổng quát', specialtyId: 1, clinicRoom: 'Phòng 101', rating: 4.9 },
-  { doctorId: 3, fullName: 'ThS. BS Trần Văn C', degree: 'Thạc sĩ Chuyên môn Tim mạch', specialtyId: 5, clinicRoom: 'Phòng 201', rating: 5.0 },
-  { doctorId: 6, fullName: 'BS. CKI Phạm Thị D', degree: 'Bác sĩ Chuyên khoa Da liễu', specialtyId: 7, clinicRoom: 'Phòng 202', rating: 4.8 },
-  { doctorId: 8, fullName: 'TS. BS Đỗ Phương Hạnh', degree: 'Tiến sĩ Chuyên môn Phụ & Sản khoa', specialtyId: 3, clinicRoom: 'Phòng 301', rating: 5.0 },
-  { doctorId: 9, fullName: 'BS. CKII Phạm Tuấn Kiệt', degree: 'Chuyên khoa II Cơ xương khớp', specialtyId: 4, clinicRoom: 'Phòng 302', rating: 5.0 },
-];
-
 const HOT_KEYWORDS = ['Tim mạch', 'Cơ xương khớp', 'Khám tổng quát', 'Da liễu', 'Tầm soát ung thư', 'Phụ sản'];
 
 // ── Vietnamese Accent Stripper / Normalizer ────────────────────────────────────
@@ -106,7 +98,7 @@ const isFuzzyMatch = (queryStr: string, targetText: string): boolean => {
 const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ visible, onClose, navigation, initialVoiceMode }) => {
   const { isDarkMode, t } = useSettings();
   const [searchText, setSearchText] = useState('');
-  const [doctorsList, setDoctorsList] = useState<any[]>(DEFAULT_DOCTORS);
+  const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -134,7 +126,8 @@ const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ visible, onClose,
         setDoctorsList(res);
       }
     } catch (err) {
-      console.log('Using default cached doctors in search:', err);
+      console.log('Error fetching doctors in search:', err);
+      setDoctorsList([]);
     } finally {
       setLoading(false);
     }
