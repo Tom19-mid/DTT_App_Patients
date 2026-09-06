@@ -81,9 +81,12 @@ const QRScannerScreen = ({ navigation, route }: any) => {
         const qrJson = JSON.parse(data);
         if (qrJson.type === 'DTT_PRESCRIPTION' || qrJson.prescriptionId) {
           setProcessing(false);
+          // LƯU Ý: đây chỉ đọc thông tin có sẵn TRONG mã QR để hiển thị tạm thời — không có API
+          // nào lưu/đồng bộ dữ liệu này vào hồ sơ y tế trên server, nên không được thông báo cho
+          // người dùng như thể việc đó đã xảy ra.
           Alert.alert(
-            '✅ Quét đơn thuốc thành công!',
-            `Đã xác thực Đơn thuốc điện tử của Bác sĩ ${qrJson.doctorName || 'điều trị'}.\n\nHệ thống đã lưu và đồng bộ toa thuốc vào hồ sơ y tế của bạn.`,
+            '✅ Đã đọc mã QR đơn thuốc',
+            `Đã đọc thông tin Đơn thuốc điện tử của Bác sĩ ${qrJson.doctorName || 'điều trị'} từ mã QR.\n\nĐây chỉ là xem nhanh từ mã QR, chưa được lưu vào hồ sơ y tế trên hệ thống.`,
             [
               {
                 text: 'Xem đơn thuốc',
@@ -92,11 +95,11 @@ const QRScannerScreen = ({ navigation, route }: any) => {
                     document: {
                       id: qrJson.prescriptionId || '101',
                       title: `Đơn thuốc điện tử - ${qrJson.doctorName || 'Không rõ bác sĩ'}`,
-                      date: qrJson.date || '01/08/2026',
+                      date: qrJson.date || 'Không rõ ngày',
                       type: 'Đơn thuốc',
                       doctor: qrJson.doctorName || 'Không rõ bác sĩ',
                       clinicKey: 'general_internal',
-                      code: `TT-20260801-${qrJson.prescriptionId || '101'}`
+                      code: qrJson.prescriptionId ? `TT-${qrJson.prescriptionId}` : 'Không rõ mã'
                     }
                   });
                 }
