@@ -23,7 +23,17 @@ import { storage } from "./storage";
 //       ? "http://10.0.2.2:5000/api"
 //       : `http://${DEV_SERVER_IP}:5000/api`;
 
-// Tự động nhận diện IP của máy tính đang chạy Expo Metro bundler
+// Backend đã deploy lên Render (xem mục 3.6.1 báo cáo) — dùng URL này thay vì
+// dò IP LAN cục bộ, để app chạy được ở bất kỳ đâu có Internet, không cần cùng
+// mạng với máy chạy dotnet run nữa.
+const CLOUD_BASE_URL = "https://dtt-healthcare-api.onrender.com/api";
+
+// Đặt false nếu muốn quay lại chạy Backend cục bộ (dò IP LAN của máy chạy Expo
+// Metro bundler) để phát triển/debug offline.
+const USE_CLOUD_BACKEND = true;
+
+// Tự động nhận diện IP của máy tính đang chạy Expo Metro bundler (chỉ dùng khi
+// USE_CLOUD_BACKEND = false)
 const getDevServerIp = (): string => {
   const hostUri =
     Constants.expoConfig?.hostUri ||
@@ -34,14 +44,12 @@ const getDevServerIp = (): string => {
   return "192.168.1.6";
 };
 
-// const DEV_SERVER_IP = "192.168.1.6";
 const DEV_SERVER_IP = getDevServerIp();
-export const BASE_URL =
-  Platform.OS === "web"
+export const BASE_URL = USE_CLOUD_BACKEND
+  ? CLOUD_BASE_URL
+  : Platform.OS === "web"
     ? "http://localhost:5000/api"
-    : // : Platform.OS === "android"
-      //   ? "http://192.168.1.6:5000/api"
-      `http://${DEV_SERVER_IP}:5000/api`;
+    : `http://${DEV_SERVER_IP}:5000/api`;
 
 if (__DEV__) {
   console.log(`[API Service] BASE_URL configured as: ${BASE_URL}`);
