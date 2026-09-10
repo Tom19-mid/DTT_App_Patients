@@ -85,7 +85,7 @@ const QRScannerScreen = ({ navigation, route }: any) => {
           // nào lưu/đồng bộ dữ liệu này vào hồ sơ y tế trên server, nên không được thông báo cho
           // người dùng như thể việc đó đã xảy ra.
           Alert.alert(
-            '✅ Đã đọc mã QR đơn thuốc',
+            'Đã đọc mã QR đơn thuốc',
             `Đã đọc thông tin Đơn thuốc điện tử của Bác sĩ ${qrJson.doctorName || 'điều trị'} từ mã QR.\n\nĐây chỉ là xem nhanh từ mã QR, chưa được lưu vào hồ sơ y tế trên hệ thống.`,
             [
               {
@@ -136,7 +136,7 @@ const QRScannerScreen = ({ navigation, route }: any) => {
         // Hồ sơ liên kết qua QR giờ ở trạng thái "pending" (chờ Lễ Tân đối chiếu CCCD thực tế),
         // KHÔNG còn tự động "đã xác thực" như trước — tiêu đề/nội dung không được ngụ ý đã xong.
         Alert.alert(
-          '✅ Đã liên kết hồ sơ',
+          'Đã liên kết hồ sơ',
           res.message || `Hồ sơ bệnh nhân #${patientId} đã được liên kết — vui lòng mang CCCD ra quầy Lễ Tân để hoàn tất xác thực.`,
           [
             {

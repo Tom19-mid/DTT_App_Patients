@@ -40,6 +40,9 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
     doctorId,
     specialtyId,
     packageId,
+    memberId,
+    profileName,
+    profileRelationship,
   } = route.params || {};
   const finalSpecialty = specialty || specialtyName || "Nội tổng quát";
   const finalTime = time || timeSlot || "08:30 - 09:30";
@@ -168,7 +171,8 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
       if (type === "package" && packageId) {
         res = await apiHealthPackage.bookPackage(packageId, {
           patientId: currentUser?.patientId,
-          patientName: currentUser?.fullName || "Bệnh nhân",
+          memberId,
+          patientName: profileName || currentUser?.fullName || "Bệnh nhân",
           preferredDate: selectedPackageDate,
           preferredTimeSlot: selectedPackageTime,
           priceFormatted: finalPrice,
@@ -176,6 +180,7 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
       } else {
         res = await apiAppointment.createAppointment({
           patientId: currentUser?.patientId,
+          memberId,
           doctorId,
           doctorName: doctorName || "Không xác định",
           specialtyName: finalSpecialty,
@@ -257,6 +262,20 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
         <View style={[styles.card, SHADOWS.card]}>
           {type === "doctor" ? (
             <>
+              {memberId ? (
+                <View style={styles.infoRow}>
+                  <Ionicons
+                    name="people-outline"
+                    size={20}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.infoText}>
+                    <Text style={styles.label}>Khám cho: </Text>
+                    {profileName || "Người thân"}
+                    {profileRelationship ? ` (${profileRelationship})` : ""}
+                  </Text>
+                </View>
+              ) : null}
               <View style={styles.infoRow}>
                 <Ionicons
                   name="person-outline"
@@ -304,6 +323,20 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
             </>
           ) : (
             <>
+              {memberId ? (
+                <View style={styles.infoRow}>
+                  <Ionicons
+                    name="people-outline"
+                    size={20}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.infoText}>
+                    <Text style={styles.label}>Khám cho: </Text>
+                    {profileName || "Người thân"}
+                    {profileRelationship ? ` (${profileRelationship})` : ""}
+                  </Text>
+                </View>
+              ) : null}
               <View style={styles.infoRow}>
                 <Ionicons
                   name="medkit-outline"
@@ -476,8 +509,8 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
             <Text style={styles.modalTitle}>Đặt lịch thành công!</Text>
             <Text style={styles.modalMessage}>
               {type === "package"
-                ? `Gói khám "${packageName || "sức khỏe"}" đã được đăng ký thành công vào ngày ${selectedPackageDate} (${selectedPackageTime}).\n\nMã số thứ tự của bạn là `
-                : `Lịch khám của bạn đã được ghi nhận trên hệ thống DTT Healthcare vào ngày ${date} (${finalTime}).\n\nMã số thứ tự của bạn là `}
+                ? `Gói khám "${packageName || "sức khỏe"}" đã được đăng ký thành công vào ngày ${selectedPackageDate} (${selectedPackageTime}).\n\nMã khung giờ của bạn là `
+                : `Lịch khám của bạn đã được ghi nhận trên hệ thống DTT Healthcare vào ngày ${date} (${finalTime}).\n\nMã khung giờ của bạn là `}
               <Text style={{ fontWeight: "bold", color: COLORS.primary }}>
                 #{bookingResult?.queueNumber || 1}
               </Text>

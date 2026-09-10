@@ -326,7 +326,11 @@ const styles = StyleSheet.create({
   headerSubtitle: { fontSize: 11, color: COLORS.placeholder, marginTop: 2 },
   centerFill: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  listContent: { padding: 16, paddingBottom: 12 },
+  // flexGrow: 1 + justifyContent: 'flex-end' — khi ít tin nhắn, nội dung dồn xuống SÁT ĐÁY khung chat
+  // (đúng hành vi app chat chuẩn) thay vì dồn lên đầu và để trống cả khoảng lớn phía dưới cho tới
+  // thanh nhập liệu/banner "đã kết thúc" (đúng như báo cáo: khoảng trống rất xa ở dưới khi hội thoại
+  // ngắn, cả lúc đang chat lẫn khi đã kết thúc).
+  listContent: { padding: 16, paddingBottom: 12, flexGrow: 1, justifyContent: 'flex-end' },
   bubbleRow: { flexDirection: 'row', marginBottom: 14, alignItems: 'flex-end' },
   bubbleRowRight: { justifyContent: 'flex-end' },
   avatar: {

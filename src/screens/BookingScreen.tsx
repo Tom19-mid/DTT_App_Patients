@@ -5,6 +5,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import DraggableChat from '../components/DraggableChat';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { apiMedical } from '../services/apiService';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -82,6 +83,7 @@ const iconForSpecialtyName = (name: string): string => {
 
 const BookingScreen = ({ route, navigation }: any) => {
   const { isDarkMode, t } = useSettings();
+  const { profiles } = useAuth();
   const initialSpecialty = route.params?.specialty || route.params?.specialtyName || t('specialties');
   const requestedDoctorId: number | undefined = route.params?.doctorId || undefined;
   const [expandedId, setExpandedId] = useState<number | null>(route.params?.doctorId || 3);
@@ -102,6 +104,33 @@ const BookingScreen = ({ route, navigation }: any) => {
       })
       .catch(() => {});
   }, []);
+
+  // Dropdown "Đặt lịch cho": Bản thân | Người thân — chỉ liệt kê hồ sơ người thân của CHÍNH tài khoản
+  // đang đăng nhập (profiles đến từ AuthContext, vốn đã lọc theo patientId của currentUser ở backend),
+  // để người thân không cần được cấp tài khoản riêng vẫn có thể được đặt lịch khám qua tài khoản người
+  // thân đã tạo hồ sơ cho họ.
+  const selfProfile = useMemo(
+    () => profiles.find(p => p.isOwner || p.relationship === 'Bản thân') || profiles[0],
+    [profiles]
+  );
+  const familyProfiles = useMemo(
+    () => profiles.filter(p => !(p.isOwner || p.relationship === 'Bản thân')),
+    [profiles]
+  );
+  const [selectedProfileId, setSelectedProfileId] = useState<string | undefined>(undefined);
+  const [isProfileModalVisible, setProfileModalVisible] = useState(false);
+
+  const selectedProfile = useMemo(
+    () => profiles.find(p => p.id === selectedProfileId) || selfProfile,
+    [profiles, selectedProfileId, selfProfile]
+  );
+
+  // Không có hồ sơ người thân nào -> bấm vào dropdown không có gì xảy ra (không mở popup rỗng chỉ để
+  // chọn lại đúng "Bản thân" đang chọn sẵn).
+  const handleOpenProfileDropdown = () => {
+    if (familyProfiles.length === 0) return;
+    setProfileModalVisible(true);
+  };
 
   // Calendar State
   const tomorrow = new Date();
@@ -298,17 +327,31 @@ const BookingScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        {/* Dropdown Chuyên khoa */}
+        {/* Dropdown Chuyên khoa + Dropdown Đặt lịch cho (Bản thân | Người thân) */}
         <View style={styles.dropdownWrapper}>
-          <TouchableOpacity 
-            style={styles.dropdownBtn}
-            onPress={() => setSpecialtyModalVisible(true)}
-          >
-            <Text style={[styles.dropdownText, selectedSpecialty !== t('specialties') && selectedSpecialty !== 'Chuyên khoa' && { color: COLORS.primary, fontWeight: 'bold' }]}>
-              {selectedSpecialty}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={COLORS.text} />
-          </TouchableOpacity>
+          <View style={styles.dropdownRow}>
+            <TouchableOpacity
+              style={styles.dropdownBtn}
+              onPress={() => setSpecialtyModalVisible(true)}
+            >
+              <Text style={[styles.dropdownText, selectedSpecialty !== t('specialties') && selectedSpecialty !== 'Chuyên khoa' && { color: COLORS.primary, fontWeight: 'bold' }]}>
+                {selectedSpecialty}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={COLORS.text} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.dropdownBtn}
+              activeOpacity={familyProfiles.length === 0 ? 1 : 0.7}
+              onPress={handleOpenProfileDropdown}
+            >
+              <Ionicons name="person-circle-outline" size={16} color={COLORS.text} />
+              <Text style={styles.dropdownText} numberOfLines={1}>
+                {selectedProfile && selectedProfile.relationship !== 'Bản thân' ? selectedProfile.name : 'Bản thân'}
+              </Text>
+              {familyProfiles.length > 0 && <Ionicons name="chevron-down" size={16} color={COLORS.text} />}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Month Selector */}
@@ -448,6 +491,7 @@ const BookingScreen = ({ route, navigation }: any) => {
                               key={idx} 
                               style={[styles.timeSlotBtn, SHADOWS.input]}
                               onPress={() => {
+                                const isOwnerSelected = !selectedProfile || selectedProfile.isOwner || selectedProfile.relationship === 'Bản thân';
                                 navigation.navigate('ConfirmBooking', {
                                   type: 'doctor',
                                   doctorId: doc.id,
@@ -455,7 +499,10 @@ const BookingScreen = ({ route, navigation }: any) => {
                                   specialty: selectedSpecialty,
                                   date: doc.date,
                                   time: time,
-                                  price: '250.000đ'
+                                  price: '250.000đ',
+                                  memberId: isOwnerSelected ? undefined : selectedProfile?.realId,
+                                  profileName: selectedProfile?.name,
+                                  profileRelationship: selectedProfile?.relationship,
                                 });
                               }}
                             >
@@ -526,6 +573,67 @@ const BookingScreen = ({ route, navigation }: any) => {
                       </Text>
                     </View>
                     
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Profile Selection Modal: Bản thân | Người thân */}
+      <Modal
+        visible={isProfileModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setProfileModalVisible(false)}>
+          <View style={[styles.modalContent, SHADOWS.card]} onStartShouldSetResponder={() => true}>
+
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Đặt lịch cho ai?</Text>
+              <TouchableOpacity onPress={() => setProfileModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={selfProfile ? [selfProfile, ...familyProfiles] : familyProfiles}
+              keyExtractor={(item: any) => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.specialtyListContent}
+              renderItem={({ item }) => {
+                const isSelected = (selectedProfile?.id ?? selfProfile?.id) === item.id;
+                const isSelf = item.relationship === 'Bản thân';
+                return (
+                  <TouchableOpacity
+                    style={[styles.specialtyOption, isSelected && styles.specialtyOptionActive]}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedProfileId(item.id);
+                      setProfileModalVisible(false);
+                    }}
+                  >
+                    <View style={styles.specialtyRowLeft}>
+                      <View style={[styles.specialtyIconBox, isSelected && styles.specialtyIconBoxActive]}>
+                        <Ionicons
+                          name={isSelf ? 'person' : 'people'}
+                          size={18}
+                          color={isSelected ? '#fff' : COLORS.primary}
+                        />
+                      </View>
+                      <View>
+                        <Text style={[styles.specialtyOptionText, isSelected && styles.specialtyOptionTextActive]}>
+                          {isSelf ? 'Bản thân' : item.name}
+                        </Text>
+                        {!isSelf && <Text style={styles.profileRelationText}>{item.relationship}</Text>}
+                      </View>
+                    </View>
+
                     {isSelected && (
                       <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
                     )}
@@ -613,6 +721,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  dropdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   dropdownBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -621,6 +735,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     gap: 8,
+    maxWidth: 170,
   },
   dropdownText: {
     fontSize: 13,
@@ -905,6 +1020,11 @@ const styles = StyleSheet.create({
   specialtyOptionTextActive: {
     color: COLORS.primary,
     fontWeight: '700',
+  },
+  profileRelationText: {
+    fontSize: 12,
+    color: COLORS.placeholder,
+    marginTop: 2,
   },
 });
 

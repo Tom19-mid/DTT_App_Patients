@@ -20,7 +20,7 @@ const FALLBACK_IMAGES: Record<number, string> = {
 
 const PackagesScreen = ({ route, navigation }: any) => {
   const { isDarkMode, t } = useSettings();
-  const { currentUser } = useAuth();
+  const { currentUser, profiles } = useAuth();
   const { showAlert } = useCustomAlert();
   const { selectedId } = route.params || {};
   const [packages, setPackages] = useState<HealthPackage[]>([]);
@@ -31,15 +31,33 @@ const PackagesScreen = ({ route, navigation }: any) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  // Load packages from API on mount
+  // Đặt gói khám cho: Bản thân | Người thân — cùng cơ chế với BookingScreen (chỉ liệt kê hồ sơ
+  // người thân của CHÍNH tài khoản đang đăng nhập, không cần người thân tự có tài khoản riêng).
+  const selfProfile = profiles.find(p => p.isOwner || p.relationship === 'Bản thân') || profiles[0];
+  const familyProfiles = profiles.filter(p => !(p.isOwner || p.relationship === 'Bản thân'));
+  const [selectedProfileId, setSelectedProfileId] = useState<string | undefined>(undefined);
+  const [isProfileModalVisible, setProfileModalVisible] = useState(false);
+  const selectedProfile = profiles.find(p => p.id === selectedProfileId) || selfProfile;
+  const handleOpenProfileDropdown = () => {
+    if (familyProfiles.length === 0) return;
+    setProfileModalVisible(true);
+  };
+
+  // Load packages from API on mount — lọc theo giới tính của CHỦ TÀI KHOẢN (backend hỗ trợ sẵn tham
+  // số gender để lọc gói "chỉ dành cho Nam/Nữ", nhưng trước đây màn này gọi getAll() không truyền gì
+  // cả nên hiện ĐỦ MỌI gói bất kể giới tính — vd bệnh nhân Nam vẫn thấy và đặt được gói "Chỉ dành cho
+  // Nữ". Trường hợp đặt cho người thân khác giới tính chủ tài khoản vẫn được chặn đúng ở backend lúc
+  // thật sự đặt (BookPackage đã bổ sung kiểm tra riêng), đây chỉ là lọc hiển thị cho gọn danh sách.
   useEffect(() => {
     fetchPackages();
-  }, []);
+  }, [selfProfile?.gender]);
 
   const fetchPackages = async () => {
     try {
       setLoading(true);
-      const data = await apiHealthPackage.getAll();
+      const g = selfProfile?.gender?.toLowerCase();
+      const genderParam = g === 'male' || g === 'female' ? (g as 'male' | 'female') : undefined;
+      const data = await apiHealthPackage.getAll(genderParam);
       setPackages(data);
     } catch (e) {
       console.log('Error fetching health packages:', e);
@@ -87,8 +105,8 @@ const PackagesScreen = ({ route, navigation }: any) => {
       });
       handleCloseDetail();
       showAlert({
-        title: '✅ Đặt gói khám thành công!',
-        message: `Gói **${result.packageTitle}** đã được đặt thành công.\n\n📅 Ngày dự kiến: ${result.preferredDate}\n💰 Chi phí: ${result.priceFormatted}\n🔢 Số thứ tự: ${result.queueNumber}`,
+        title: 'Đặt gói khám thành công!',
+        message: `Gói **${result.packageTitle}** đã được đặt thành công.\n\n📅 Ngày dự kiến: ${result.preferredDate}\n💰 Chi phí: ${result.priceFormatted}\n🔢 Mã khung giờ: ${result.queueNumber}`,
         type: 'success',
         confirmText: 'Xem lịch khám',
         cancelText: 'Đóng',
@@ -206,7 +224,19 @@ const PackagesScreen = ({ route, navigation }: any) => {
                 <View style={styles.detailBody}>
                   <Text style={[styles.detailTitle, isDarkMode && { color: '#F3F4F6' }]}>{selectedPackage.title}</Text>
                   <Text style={styles.detailPrice}>{selectedPackage.priceFormatted}</Text>
-                  
+
+                  <TouchableOpacity
+                    style={styles.profileDropdownBtn}
+                    activeOpacity={familyProfiles.length === 0 ? 1 : 0.7}
+                    onPress={handleOpenProfileDropdown}
+                  >
+                    <Ionicons name="person-circle-outline" size={16} color={COLORS.primary} />
+                    <Text style={styles.profileDropdownText}>
+                      Đặt cho: {selectedProfile && selectedProfile.relationship !== 'Bản thân' ? selectedProfile.name : 'Bản thân'}
+                    </Text>
+                    {familyProfiles.length > 0 && <Ionicons name="chevron-down" size={16} color={COLORS.primary} />}
+                  </TouchableOpacity>
+
                   <View style={styles.infoBadgeRow}>
                     <View style={styles.infoBadge}>
                       <Ionicons name="people" size={14} color={COLORS.primary} />
@@ -239,13 +269,17 @@ const PackagesScreen = ({ route, navigation }: any) => {
                   <Text style={styles.totalPrice}>{selectedPackage.priceFormatted}</Text>
                 </View>
                 <TouchableOpacity style={styles.mainBookBtn} onPress={() => {
+                  const isOwnerSelected = !selectedProfile || selectedProfile.isOwner || selectedProfile.relationship === 'Bản thân';
                   handleCloseDetail();
                   setTimeout(() => {
-                    navigation.navigate('ConfirmBooking', { 
+                    navigation.navigate('ConfirmBooking', {
                       type: 'package',
                       packageId: selectedPackage.packageId,
                       packageName: selectedPackage.title,
-                      price: selectedPackage.priceFormatted
+                      price: selectedPackage.priceFormatted,
+                      memberId: isOwnerSelected ? undefined : selectedProfile?.realId,
+                      profileName: selectedProfile?.name,
+                      profileRelationship: selectedProfile?.relationship,
                     });
                   }, 300);
                 }}>
@@ -255,6 +289,53 @@ const PackagesScreen = ({ route, navigation }: any) => {
             </View>
           )}
         </Animated.View>
+      </Modal>
+
+      {/* Profile Selection Modal: Bản thân | Người thân */}
+      <Modal
+        visible={isProfileModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setProfileModalVisible(false)}>
+          <View style={styles.profileModalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.profileModalContent, isDarkMode && { backgroundColor: '#1F2937' }]}>
+                <View style={styles.profileModalHeader}>
+                  <Text style={[styles.profileModalTitle, isDarkMode && { color: '#F3F4F6' }]}>Đặt gói khám cho ai?</Text>
+                  <TouchableOpacity onPress={() => setProfileModalVisible(false)} style={styles.closeBtn}>
+                    <Ionicons name="close" size={20} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+                {(selfProfile ? [selfProfile, ...familyProfiles] : familyProfiles).map((item) => {
+                  const isSelected = (selectedProfile?.id ?? selfProfile?.id) === item.id;
+                  const isSelf = item.relationship === 'Bản thân';
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.profileOption, isSelected && styles.profileOptionActive]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setSelectedProfileId(item.id);
+                        setProfileModalVisible(false);
+                      }}
+                    >
+                      <Ionicons name={isSelf ? 'person' : 'people'} size={18} color={isSelected ? '#fff' : COLORS.primary} style={{ marginRight: 12 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.profileOptionText, isSelected && styles.profileOptionTextActive]}>
+                          {isSelf ? 'Bản thân' : item.name}
+                        </Text>
+                        {!isSelf && <Text style={[styles.profileOptionRelation, isSelected && { color: '#E0E7FF' }]}>{item.relationship}</Text>}
+                      </View>
+                      {isSelected && <Ionicons name="checkmark-circle" size={22} color="#fff" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
     </SafeAreaView>
@@ -362,6 +443,32 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary, paddingHorizontal: 30, paddingVertical: 14, borderRadius: 25,
   },
   mainBookBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+
+  // Profile picker ("Đặt cho: Bản thân | Người thân")
+  profileDropdownBtn: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6,
+    backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 16, marginBottom: 16,
+  },
+  profileDropdownText: { fontSize: 13, fontWeight: '600', color: COLORS.primary },
+  profileModalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24,
+  },
+  profileModalContent: {
+    width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: 16,
+  },
+  profileModalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
+  },
+  profileModalTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.text },
+  profileOption: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12,
+    borderRadius: 14, marginBottom: 6, backgroundColor: '#F8FAFC',
+  },
+  profileOptionActive: { backgroundColor: COLORS.primary },
+  profileOptionText: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  profileOptionTextActive: { color: '#fff' },
+  profileOptionRelation: { fontSize: 12, color: COLORS.placeholder, marginTop: 2 },
 });
 
 export default PackagesScreen;

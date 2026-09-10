@@ -219,6 +219,14 @@ const CalendarScreen = ({ navigation }: any) => {
         paymentStatus: app.paymentStatus || 'unpaid',
         isUpcoming: isUpcoming,
         isPackage: isPkg,
+        // Lịch hẹn đặt cho người thân (memberId khác null) — backend đã resolve đúng patientName/
+        // patientGender/patientAge theo hồ sơ người thân đó, không phải chủ tài khoản (xem
+        // AppointmentDetailScreen "Thông tin bệnh nhân").
+        memberId: app.memberId,
+        patientName: app.patientName,
+        patientGender: app.patientGender,
+        patientAge: app.patientAge,
+        queueNumber: app.queueNumber,
       };
     });
 

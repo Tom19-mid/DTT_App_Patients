@@ -39,7 +39,9 @@ const PatientProfilesScreen = ({ navigation }: any) => {
             // Cập nhật trạng thái hồ sơ chủ trong danh sách hồ sơ
             const ownerProfile = profiles.find((p) => p.isOwner);
             if (ownerProfile) {
-              updateProfile(ownerProfile.id, {
+              // updateProfile giờ throw khi API thất bại (xem AuthContext) — phải await để lỗi rơi
+              // đúng vào khối try/catch bao quanh, tránh unhandled promise rejection.
+              await updateProfile(ownerProfile.id, {
                 verificationStatus: "verified",
                 isVerified: true,
               });

@@ -60,10 +60,14 @@ const NotificationScreen = ({ navigation }: any) => {
 
   const handleMarkAllAsRead = async () => {
     if (!currentUser?.patientId) return;
+    const previous = notifications;
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     try {
       await apiNotifications.markAllAsRead(currentUser.patientId);
     } catch (e) {
+      // Rollback nếu API thất bại — trước đây chỉ console.log, badge "chưa đọc" trên toàn app vẫn hiện
+      // đã đọc hết dù backend chưa hề cập nhật, không đồng bộ với dữ liệu thật.
+      setNotifications(previous);
       console.log('Error mark all read:', e);
     }
   };
@@ -74,6 +78,8 @@ const NotificationScreen = ({ navigation }: any) => {
       try {
         await apiNotifications.markAsRead(item.id);
       } catch (e) {
+        // Rollback: trả lại trạng thái "chưa đọc" nếu API thất bại, tránh badge chưa đọc lệch khỏi DB.
+        setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: false } : n));
         console.log('Error marking as read:', e);
       }
     }
@@ -251,7 +257,12 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   listContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    // Đủ chỗ chừa cho thanh tab nổi (CustomTabBar) + nút chat nổi (DraggableChat) đè lên phía dưới —
+    // trước đây chỉ padding: 16 nên các thông báo cuối danh sách bị 2 lớp nổi này che khuất khi cuộn
+    // hết, trông như "không hiện gì" dù dữ liệu vẫn còn.
+    paddingBottom: 150,
   },
   notificationCard: {
     flexDirection: 'row',

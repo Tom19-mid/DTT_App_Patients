@@ -63,7 +63,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
             'Bệnh nhân hủy lịch qua ứng dụng'
           );
           showAlert({
-            title: '✅ Hủy lịch thành công',
+            title: 'Hủy lịch thành công',
             message: 'Lịch khám của bạn đã được hủy thành công.\n\nBạn có thể đặt lại lịch bất kỳ lúc nào trên ứng dụng.',
             type: 'success',
             confirmText: 'Về trang lịch khám',
@@ -236,6 +236,22 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
           </View>
           <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
 
+          {/* Trước đây chỉ hiện MỘT LẦN duy nhất trên modal "Đặt lịch thành công" rồi biến mất — không
+              xem lại được ở đâu nữa. Hiển thị lại ở đây (backend trả sẵn queueNumber, đã re-đọc từ DB
+              sau khi trigger trg_set_queue_number chạy nên luôn khớp với giá trị thật).
+              Nhãn "Mã khung giờ" (không phải "Số thứ tự") vì giá trị này thực chất là ID cố định của
+              khung giờ 30 phút được đặt (SeedDoctorSchedulesAsync gán cứng 1-8 theo mốc giờ, không đếm
+              theo số bệnh nhân trong ngày) — gọi là "số thứ tự" dễ khiến hiểu nhầm là vị trí xếp hàng. */}
+          {safeApp.queueNumber ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>Mã khung giờ</Text>
+                <Text style={[styles.infoValueHighlight, isDarkMode && { color: '#F87171' }]}>{safeApp.queueNumber}</Text>
+              </View>
+              <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
+            </>
+          ) : null}
+
           {!isPkg && safeApp.clinicRoom ? (
             <>
               <View style={styles.infoRow}>
@@ -275,7 +291,10 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
         <View style={[styles.card, SHADOWS.card, isDarkMode && { backgroundColor: '#374151' }]}>
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>Họ và tên</Text>
-            <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>{currentUser?.fullName || 'Đặng Nguyễn'}</Text>
+            {/* Lịch hẹn đặt cho người thân (safeApp.memberId khác null) phải hiện đúng tên người thân đó
+                (backend đã trả sẵn ở safeApp.patientName) — trước đây luôn hiện currentUser.fullName
+                (chủ tài khoản) bất kể lịch hẹn này thực chất đặt cho ai. */}
+            <Text style={[styles.infoValue, isDarkMode && { color: '#F3F4F6' }]}>{safeApp.patientName || currentUser?.fullName || 'Đặng Nguyễn'}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>

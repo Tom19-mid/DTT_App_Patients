@@ -76,9 +76,11 @@ interface AuthContextType {
   isVerified: boolean;
   setIsVerified: (value: boolean) => void;
   profiles: PatientProfile[];
-  addProfile: (profile: Omit<PatientProfile, 'id' | 'patientId' | 'verificationStatus' | 'isVerified'>) => void;
-  updateProfile: (id: string, updates: Partial<PatientProfile>) => void;
-  deleteProfile: (id: string) => void;
+  // Cả 3 hàm đều throw khi backend từ chối (vd tài khoản chưa xác thực CCCD) — màn hình gọi PHẢI await +
+  // try/catch để biết thao tác thất bại, thay vì coi mọi lần gọi đều thành công.
+  addProfile: (profile: Omit<PatientProfile, 'id' | 'patientId' | 'verificationStatus' | 'isVerified'>) => Promise<void>;
+  updateProfile: (id: string, updates: Partial<PatientProfile>) => Promise<void>;
+  deleteProfile: (id: string) => Promise<void>;
   recentServices: RecentServiceItem[];
   addRecentService: (item: Omit<RecentServiceItem, 'id' | 'time'> & { time?: string }) => void;
   // Tăng dần mỗi khi Hub báo "NotificationsChanged" — màn nào cần tự làm mới danh sách/badge
@@ -105,9 +107,9 @@ const AuthContext = createContext<AuthContextType>({
   isVerified: false,
   setIsVerified: () => {},
   profiles: [],
-  addProfile: () => {},
-  updateProfile: () => {},
-  deleteProfile: () => {},
+  addProfile: async () => {},
+  updateProfile: async () => {},
+  deleteProfile: async () => {},
   recentServices: [],
   addRecentService: () => {},
   notificationsTick: 0,
@@ -238,25 +240,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         cccd: data.cccd,
         bhyt: data.bhyt,
       });
-      if (res && res.success && res.profile) {
-        setProfiles(prev => prev.map(p => p.id === tempId ? {
-          id: res.profile!.id,
-          realId: res.profile!.realId,
-          isOwner: res.profile!.isOwner,
-          name: res.profile!.name,
-          patientId: res.profile!.patientId,
-          relationship: res.profile!.relationship,
-          verificationStatus: (res.profile!.verificationStatus as VerificationStatus) || 'pending',
-          isVerified: res.profile!.isVerified,
-          dob: res.profile!.dob,
-          gender: res.profile!.gender,
-          phone: res.profile!.phone,
-          cccd: res.profile!.cccd,
-          bhyt: res.profile!.bhyt,
-        } : p));
+      if (!res || !res.success || !res.profile) {
+        throw new Error(res?.message || 'Không thể thêm hồ sơ người thân.');
       }
+      setProfiles(prev => prev.map(p => p.id === tempId ? {
+        id: res.profile!.id,
+        realId: res.profile!.realId,
+        isOwner: res.profile!.isOwner,
+        name: res.profile!.name,
+        patientId: res.profile!.patientId,
+        relationship: res.profile!.relationship,
+        verificationStatus: (res.profile!.verificationStatus as VerificationStatus) || 'pending',
+        isVerified: res.profile!.isVerified,
+        dob: res.profile!.dob,
+        gender: res.profile!.gender,
+        phone: res.profile!.phone,
+        cccd: res.profile!.cccd,
+        bhyt: res.profile!.bhyt,
+      } : p));
     } catch (e) {
+      // Rollback optimistic update — bản ghi tạm này CHƯA hề được lưu vào DB (vd bị backend từ chối vì
+      // chủ tài khoản chưa xác thực CCCD) — trước đây lỗi chỉ console.log, hồ sơ giả vẫn nằm lại trong
+      // state và màn ProfileDetailScreen vẫn hiện "Đã thêm hồ sơ mới" như thể thành công thật. Phải gỡ
+      // khỏi state VÀ ném lại lỗi để màn hình gọi biết thao tác thất bại, hiển thị đúng thông báo lỗi.
+      setProfiles(prev => prev.filter(p => p.id !== tempId));
       console.log('[AuthContext] Failed to save profile to DB:', e);
+      throw e;
     }
   }, [currentUser.patientId]);
 
@@ -286,18 +295,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         bhyt: updates.bhyt,
       });
     } catch (e) {
+      // Rollback về đúng giá trị TRƯỚC khi sửa nếu API thất bại — trước đây chỉ console.log, màn hình
+      // gọi vẫn hiện "Đã cập nhật hồ sơ" dù DB không hề đổi gì.
+      if (target) {
+        setProfiles(prev => prev.map(p => p.id === id ? target : p));
+      }
       console.log('[AuthContext] Failed to update profile in DB:', e);
+      throw e;
     }
   }, [profiles]);
 
   const deleteProfile = useCallback(async (id: string) => {
+    const removed = profiles.find(p => p.id === id);
     setProfiles(prev => prev.filter(p => p.id !== id));
     try {
       await apiFamilyMembers.delete(id);
     } catch (e) {
+      // Rollback: khôi phục lại hồ sơ nếu xóa thất bại ở backend — trước đây hồ sơ vẫn "biến mất" khỏi
+      // app dù thực tế vẫn còn tồn tại trong DB.
+      if (removed) {
+        setProfiles(prev => [...prev, removed]);
+      }
       console.log('[AuthContext] Failed to delete profile in DB:', e);
+      throw e;
     }
-  }, []);
+  }, [profiles]);
 
   const addRecentService = useCallback((item: Omit<RecentServiceItem, 'id' | 'time'> & { time?: string }) => {
     const now = new Date();

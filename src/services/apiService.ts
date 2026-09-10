@@ -386,12 +386,20 @@ export interface PatientAppointmentDto {
   fee: string;
   isPackage?: boolean;
   createdAt: string;
+  // Backend đã trả sẵn (AppointmentResponseDto) nhưng trước đây type này thiếu khai báo nên UI không
+  // đọc tới — lịch hẹn đặt cho người thân (memberId khác null) phải hiển thị đúng tên/giới tính/tuổi
+  // của NGƯỜI THÂN đó, không phải của chủ tài khoản.
+  memberId?: number | null;
+  patientName?: string;
+  patientGender?: string;
+  patientAge?: number;
 }
 
 // ── Appointment APIs ──────────────────────────────────────────────────────────
 export const apiAppointment = {
   createAppointment: (data: {
     patientId?: number;
+    memberId?: number;
     doctorId?: number;
     doctorName: string;
     specialtyName: string;
@@ -403,6 +411,7 @@ export const apiAppointment = {
     request<{
       appointmentId: number;
       patientId: number;
+      memberId?: number;
       doctorId: number;
       doctorName: string;
       specialtyName: string;
@@ -468,6 +477,7 @@ export const apiHealthPackage = {
     id: number,
     data: {
       patientId: number;
+      memberId?: number;
       patientName: string;
       preferredDate?: string;
       preferredTimeSlot?: string;
