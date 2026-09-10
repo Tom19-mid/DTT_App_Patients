@@ -228,6 +228,17 @@ const MedicalRecordsScreen = ({ route, navigation }: any) => {
                       <Text style={[styles.recordSub, isDarkMode && { color: '#9CA3AF' }]}>Khoa: {t(item.clinicKey)}</Text>
                     </>
                   )}
+                  {/* Backend đã trả đúng patientName theo memberId cho cả 5 danh mục (hồ sơ của bản thân
+                      hay của thành viên gia đình nào), nhưng trước đây danh sách không hiển thị field
+                      này — 1 tài khoản có nhiều hồ sơ (bản thân + người thân) thấy chung 1 danh sách lẫn
+                      lộn không phân biệt được của ai. Chỉ hiện dòng này khi khác tên chủ tài khoản đang
+                      đăng nhập, tránh lặp lại "Hồ sơ: <tên mình>" không cần thiết trên mọi thẻ. */}
+                  {!!item.patientName && item.patientName !== currentUser?.fullName && (
+                    <View style={styles.recordOwnerBadge}>
+                      <Ionicons name="person-outline" size={12} color={isDarkMode ? '#818CF8' : COLORS.primary} />
+                      <Text style={[styles.recordOwnerText, isDarkMode && { color: '#818CF8' }]}>Hồ sơ: {item.patientName}</Text>
+                    </View>
+                  )}
                 </View>
                 
                 <Ionicons name="chevron-forward" size={20} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} style={styles.chevron} />
@@ -339,6 +350,17 @@ const styles = StyleSheet.create({
   recordSub: {
     fontSize: 14,
     color: COLORS.placeholder,
+  },
+  recordOwnerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  recordOwnerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   chevron: {
     position: 'absolute',

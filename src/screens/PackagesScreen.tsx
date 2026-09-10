@@ -6,7 +6,6 @@ import { COLORS, SHADOWS } from '../constants/theme';
 import { useSettings } from '../context/SettingsContext';
 import { apiHealthPackage, HealthPackage } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
-import { useCustomAlert } from '../context/AlertContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -20,12 +19,10 @@ const FALLBACK_IMAGES: Record<number, string> = {
 
 const PackagesScreen = ({ route, navigation }: any) => {
   const { isDarkMode, t } = useSettings();
-  const { currentUser, profiles } = useAuth();
-  const { showAlert } = useCustomAlert();
+  const { profiles } = useAuth();
   const { selectedId } = route.params || {};
   const [packages, setPackages] = useState<HealthPackage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [booking, setBooking] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<HealthPackage | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -94,35 +91,10 @@ const PackagesScreen = ({ route, navigation }: any) => {
     });
   };
 
-  const handleBookPackage = async () => {
-    if (!selectedPackage) return;
-    try {
-      setBooking(true);
-      const result = await apiHealthPackage.bookPackage(selectedPackage.packageId, {
-        patientId: currentUser?.patientId,
-        patientName: currentUser?.fullName || 'Bệnh nhân',
-        priceFormatted: selectedPackage.priceFormatted,
-      });
-      handleCloseDetail();
-      showAlert({
-        title: 'Đặt gói khám thành công!',
-        message: `Gói **${result.packageTitle}** đã được đặt thành công.\n\n📅 Ngày dự kiến: ${result.preferredDate}\n💰 Chi phí: ${result.priceFormatted}\n🔢 Mã khung giờ: ${result.queueNumber}`,
-        type: 'success',
-        confirmText: 'Xem lịch khám',
-        cancelText: 'Đóng',
-        onConfirm: () => navigation.navigate('Calendar'),
-      });
-    } catch (e) {
-      showAlert({
-        title: '⚠️ Thông báo',
-        message: 'Không thể kết nối server để đặt gói khám. Vui lòng thử lại sau.',
-        type: 'error',
-        confirmText: 'Đã hiểu',
-      });
-    } finally {
-      setBooking(false);
-    }
-  };
+  // [Old code]: handleBookPackage() — hàm gọi thẳng apiHealthPackage.bookPackage() không kèm memberId/
+  // preferredDate/preferredTimeSlot, không còn được gọi ở đâu (nút "Đặt gói khám" thật đã chuyển sang
+  // điều hướng tới ConfirmBookingScreen, có đủ 3 field trên). Đã xóa để tránh ai đó nối lại nhầm vào 1
+  // nút trong tương lai và vô tình làm mất luồng chọn người thân/ngày giờ.
 
   return (
     <SafeAreaView style={styles.safeArea}>

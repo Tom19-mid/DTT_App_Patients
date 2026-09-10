@@ -595,9 +595,13 @@ export const apiNotifications = {
         }
       }
     });
+    // [Old code]: .catch(() => ({ success: true })) — nuốt MỌI lỗi thật (mất mạng, 401, 500...) và luôn
+    // coi như thành công, khiến logic rollback ở NotificationScreen.tsx (khôi phục lại trạng thái "chưa
+    // đọc" nếu API thất bại) không bao giờ có cơ hội chạy tới vì promise ở đây không bao giờ reject.
+    // Để lỗi thật được ném ra ngoài cho đúng caller tự xử lý rollback.
     return request<{ success: boolean }>(`/notifications/${id}/read`, {
       method: "PUT",
-    }).catch(() => ({ success: true }));
+    });
   },
 
   markAllAsRead: async (patientId: number) => {
@@ -609,10 +613,12 @@ export const apiNotifications = {
         }
       }
     });
+    // [Old code]: cùng lỗi với markAsRead ở trên — nuốt lỗi thật, khiến rollback ở
+    // NotificationScreen.tsx không bao giờ chạy được.
     return request<{ success: boolean; count: number }>(
       `/notifications/patient/${patientId}/read-all`,
       { method: "PUT" },
-    ).catch(() => ({ success: true, count: 0 }));
+    );
   },
 };
 

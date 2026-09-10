@@ -54,12 +54,16 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
       onConfirm: async () => {
         try {
           setCancelling(true);
-          const cancelledByInfo = currentUser?.phone
-            ? `${currentUser.fullName} (${currentUser.phone})`
-            : 'patient';
+          // [Old code]: gửi "Tên (SĐT)" thay vì đúng literal "patient" mà backend mong đợi — comment
+          // trong AppointmentsController.cs xác nhận rõ: "App Mobile luôn gửi cancelledBy='patient' khi
+          // bệnh nhân tự hủy". Vì chuỗi gửi lên không khớp "patient", backend coi MỌI lượt bệnh nhân tự
+          // hủy là NHÂN VIÊN hủy (isStaffCancelled=true), bắn nhầm thông báo "Lễ Tân đã hủy lịch của
+          // bạn" cho chính bệnh nhân vừa tự hủy, đồng thời ResolveCancellerUserIdAsync không khớp được
+          // nhánh "patient" (dò theo lower.Contains("patient")) nên rơi xuống nhánh dò tên Bác sĩ, ghi
+          // sai CancelledBy = UserId của BÁC SĨ đang khám thay vì của chính bệnh nhân.
           await apiAppointment.cancelAppointment(
             safeApp.id,
-            cancelledByInfo,
+            'patient',
             'Bệnh nhân hủy lịch qua ứng dụng'
           );
           showAlert({
@@ -70,12 +74,15 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
             onConfirm: () => navigation.goBack(),
           });
         } catch (error) {
+          // [Old code]: thông báo "Đã ghi nhận yêu cầu hủy..." ngụ ý yêu cầu đã được tiếp nhận và điều
+          // hướng về như thành công, dù request thực sự THẤT BẠI (lỗi mạng, phiên đăng nhập hết hạn,
+          // lịch đã bị hủy/xử lý bởi người khác...) — bệnh nhân tưởng đã hủy xong nên không thử lại, có
+          // thể vẫn đến khám nhầm lịch chưa hủy hoặc bỏ lỡ 1 lịch thực ra vẫn còn hiệu lực.
+          console.log('Cancel appointment error:', error);
           showAlert({
-            title: '⚠️ Thông báo',
-            message: 'Đã ghi nhận yêu cầu hủy lịch khám của bạn. Vui lòng kiểm tra lại trạng thái lịch.',
-            type: 'warning',
-            confirmText: 'Về trang lịch khám',
-            onConfirm: () => navigation.goBack(),
+            title: 'Không thể hủy lịch',
+            message: 'Đã xảy ra lỗi khi hủy lịch khám. Lịch hẹn của bạn CHƯA được hủy. Vui lòng kiểm tra kết nối mạng và thử lại.',
+            type: 'error',
           });
         } finally {
           setCancelling(false);
