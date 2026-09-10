@@ -26,7 +26,7 @@ const generateMonthGrid = (year: number, month: number) => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, month, 1).getDay();
   const startingEmptySlots = getNormalizedDay(firstDayOfMonth);
-  
+
   const grid = [];
   for (let i = 0; i < startingEmptySlots; i++) grid.push(null);
   for (let i = 1; i <= daysInMonth; i++) grid.push(new Date(year, month, i));
@@ -102,7 +102,7 @@ const BookingScreen = ({ route, navigation }: any) => {
           setApiSpecialties(list.map(s => ({ specialtyId: s.specialtyId, name: s.specialtyName, icon: iconForSpecialtyName(s.specialtyName) })));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Dropdown "Đặt lịch cho": Bản thân | Người thân — chỉ liệt kê hồ sơ người thân của CHÍNH tài khoản
@@ -147,13 +147,13 @@ const BookingScreen = ({ route, navigation }: any) => {
   }, [currentMonth]);
 
   const weekGrid = useMemo(() => {
-    const dateToFind = selectedDate.getMonth() === currentMonth.getMonth() && selectedDate.getFullYear() === currentMonth.getFullYear() 
-      ? selectedDate 
+    const dateToFind = selectedDate.getMonth() === currentMonth.getMonth() && selectedDate.getFullYear() === currentMonth.getFullYear()
+      ? selectedDate
       : new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
 
     const dateIndex = monthGrid.findIndex(d => d && d.getDate() === dateToFind.getDate());
     const weekStartIndex = Math.floor((dateIndex === -1 ? 0 : dateIndex) / 7) * 7;
-    
+
     const week = monthGrid.slice(weekStartIndex, weekStartIndex + 7);
     while (week.length < 7) week.push(null);
     return week;
@@ -174,20 +174,20 @@ const BookingScreen = ({ route, navigation }: any) => {
     if (!date) return <View key={`empty-${index}`} style={styles.dateCol} />;
 
     const isPast = date < tomorrow;
-    const isSelected = date.getDate() === selectedDate.getDate() && 
-                       date.getMonth() === selectedDate.getMonth() && 
-                       date.getFullYear() === selectedDate.getFullYear();
+    const isSelected = date.getDate() === selectedDate.getDate() &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear();
 
     return (
       <View key={date.toISOString()} style={styles.dateCol}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.dateCircle, isSelected && styles.dateCircleActive]}
           activeOpacity={0.7}
           onPress={() => handleSelectDate(date)}
           disabled={isPast}
         >
           <Text style={[
-            styles.dateText, 
+            styles.dateText,
             isSelected && styles.dateTextActive,
             isPast && styles.dateTextPast
           ]}>
@@ -196,7 +196,7 @@ const BookingScreen = ({ route, navigation }: any) => {
         </TouchableOpacity>
         {isSelected && !isExpanded && (
           <TouchableOpacity onPress={toggleCalendar} style={styles.activeIndicatorBtn}>
-             <Ionicons name="chevron-down" size={20} color={COLORS.text} style={styles.activeIndicator} />
+            <Ionicons name="chevron-down" size={20} color={COLORS.text} style={styles.activeIndicator} />
           </TouchableOpacity>
         )}
       </View>
@@ -300,7 +300,7 @@ const BookingScreen = ({ route, navigation }: any) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        
+
         {/* Header - Back & Logo */}
         <View style={styles.header}>
           <TouchableOpacity style={[styles.backBtn, SHADOWS.card]} onPress={() => navigation.goBack()}>
@@ -318,9 +318,9 @@ const BookingScreen = ({ route, navigation }: any) => {
           <View style={[styles.bookingTab, styles.bookingTabActive]}>
             <Text style={styles.bookingTabTextActive}>{t('specialty_exam')}</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.bookingTab} 
-            activeOpacity={0.7} 
+          <TouchableOpacity
+            style={styles.bookingTab}
+            activeOpacity={0.7}
             onPress={() => navigation.navigate('Packages')}
           >
             <Text style={styles.bookingTabText}>{t('package_exam')}</Text>
@@ -359,11 +359,11 @@ const BookingScreen = ({ route, navigation }: any) => {
           <TouchableOpacity style={styles.monthBtn} activeOpacity={0.7} onPress={handlePrevMonth}>
             <Ionicons name="chevron-back" size={20} color={COLORS.text} />
           </TouchableOpacity>
-          
+
           <Text style={styles.monthText}>
             {t('month')} {currentMonth.getMonth() + 1}, {currentMonth.getFullYear()}
           </Text>
-          
+
           <TouchableOpacity style={styles.monthBtn} activeOpacity={0.7} onPress={handleNextMonth}>
             <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
           </TouchableOpacity>
@@ -377,7 +377,7 @@ const BookingScreen = ({ route, navigation }: any) => {
                 <Text key={index} style={styles.dayText}>{day}</Text>
               ))}
             </View>
-            
+
             {isExpanded ? (
               // FULL MONTH VIEW
               <View style={styles.monthGrid}>
@@ -386,7 +386,7 @@ const BookingScreen = ({ route, navigation }: any) => {
                     {renderDateItem(date, index)}
                   </View>
                 ))}
-                
+
                 {/* Collapse button for full month view */}
                 <View style={styles.collapseWrapper}>
                   <TouchableOpacity onPress={toggleCalendar} style={styles.collapseBtn}>
@@ -437,86 +437,86 @@ const BookingScreen = ({ route, navigation }: any) => {
               </Text>
             </View>
           ) : (
-          <>{currentDoctors.map((doc) => {
-            const isExpanded = expandedId === doc.id;
-            return (
-              <View key={doc.id} style={[styles.doctorCard, SHADOWS.card]}>
-                <TouchableOpacity 
-                  style={styles.doctorRow} 
-                  activeOpacity={0.7} 
-                  onPress={() => toggleExpand(doc.id)}
-                >
-                  {/* Placeholder for future DB image */}
-                  <View style={styles.doctorImgPlaceholder}>
-                    <Ionicons name="person" size={40} color="#C0C0C0" />
-                  </View>
-                  
-                  <View style={styles.doctorInfo}>
-                    <Text style={styles.doctorTitle}>{doc.title}</Text>
-                    <Text style={styles.doctorName}>{doc.name}</Text>
-                    <View style={[styles.slotBadge, doc.isWorking === false && { backgroundColor: '#F1F5F9' }]}>
-                      <Text style={[styles.slotBadgeText, doc.isWorking === false && { color: '#64748B' }]}>{doc.isWorking === false ? 'NGHỈ PHÉP (OFF)' : doc.slots}</Text>
+            <>{currentDoctors.map((doc) => {
+              const isExpanded = expandedId === doc.id;
+              return (
+                <View key={doc.id} style={[styles.doctorCard, SHADOWS.card]}>
+                  <TouchableOpacity
+                    style={styles.doctorRow}
+                    activeOpacity={0.7}
+                    onPress={() => toggleExpand(doc.id)}
+                  >
+                    {/* Placeholder for future DB image */}
+                    <View style={styles.doctorImgPlaceholder}>
+                      <Ionicons name="person" size={40} color="#C0C0C0" />
                     </View>
-                    <Text style={styles.doctorDate}>{doc.date}</Text>
-                  </View>
 
-                  <View style={[styles.expandBtn, isExpanded && styles.expandBtnActive]}>
-                    <Ionicons 
-                      name={isExpanded ? "chevron-up" : "chevron-down"} 
-                      size={20} 
-                      color="#fff" 
-                    />
-                  </View>
-                </TouchableOpacity>
-
-                {/* Expanded Time Slots */}
-                {isExpanded && (
-                  <View style={styles.expandedSection}>
-                    {doc.isWorking === false ? (
-                      <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-                        <Ionicons name="calendar-outline" size={24} color="#94A3B8" />
-                        <Text style={{ marginTop: 6, fontSize: 13, color: '#64748B', textAlign: 'center' }}>
-                          Bác sĩ {doc.name} nghỉ khám ngày này. Vui lòng chọn ngày khác.
-                        </Text>
+                    <View style={styles.doctorInfo}>
+                      <Text style={styles.doctorTitle}>{doc.title}</Text>
+                      <Text style={styles.doctorName}>{doc.name}</Text>
+                      <View style={[styles.slotBadge, doc.isWorking === false && { backgroundColor: '#F1F5F9' }]}>
+                        <Text style={[styles.slotBadgeText, doc.isWorking === false && { color: '#64748B' }]}>{doc.isWorking === false ? 'NGHỈ PHÉP (OFF)' : doc.slots}</Text>
                       </View>
-                    ) : (
-                      <>
-                        <View style={styles.expandedHeader}>
-                          <Ionicons name="time-outline" size={16} color={COLORS.text} />
-                          <Text style={styles.expandedHeaderText}>Chọn khung giờ khám</Text>
+                      <Text style={styles.doctorDate}>{doc.date}</Text>
+                    </View>
+
+                    <View style={[styles.expandBtn, isExpanded && styles.expandBtnActive]}>
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color="#fff"
+                      />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Expanded Time Slots */}
+                  {isExpanded && (
+                    <View style={styles.expandedSection}>
+                      {doc.isWorking === false ? (
+                        <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                          <Ionicons name="calendar-outline" size={24} color="#94A3B8" />
+                          <Text style={{ marginTop: 6, fontSize: 13, color: '#64748B', textAlign: 'center' }}>
+                            Bác sĩ {doc.name} nghỉ khám ngày này. Vui lòng chọn ngày khác.
+                          </Text>
                         </View>
-                        <View style={styles.slotsGrid}>
-                          {doc.timeSlots && doc.timeSlots.map((time: string, idx: number) => (
-                            <TouchableOpacity 
-                              key={idx} 
-                              style={[styles.timeSlotBtn, SHADOWS.input]}
-                              onPress={() => {
-                                const isOwnerSelected = !selectedProfile || selectedProfile.isOwner || selectedProfile.relationship === 'Bản thân';
-                                navigation.navigate('ConfirmBooking', {
-                                  type: 'doctor',
-                                  doctorId: doc.id,
-                                  doctorName: `${doc.title} ${doc.name}`,
-                                  specialty: selectedSpecialty,
-                                  date: doc.date,
-                                  time: time,
-                                  price: '250.000đ',
-                                  memberId: isOwnerSelected ? undefined : selectedProfile?.realId,
-                                  profileName: selectedProfile?.name,
-                                  profileRelationship: selectedProfile?.relationship,
-                                });
-                              }}
-                            >
-                              <Text style={styles.timeSlotText}>{time}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </>
-                    )}
-                  </View>
-                )}
-              </View>
-            );
-          })}</>
+                      ) : (
+                        <>
+                          <View style={styles.expandedHeader}>
+                            <Ionicons name="time-outline" size={16} color={COLORS.text} />
+                            <Text style={styles.expandedHeaderText}>Chọn khung giờ khám</Text>
+                          </View>
+                          <View style={styles.slotsGrid}>
+                            {doc.timeSlots && doc.timeSlots.map((time: string, idx: number) => (
+                              <TouchableOpacity
+                                key={idx}
+                                style={[styles.timeSlotBtn, SHADOWS.input]}
+                                onPress={() => {
+                                  const isOwnerSelected = !selectedProfile || selectedProfile.isOwner || selectedProfile.relationship === 'Bản thân';
+                                  navigation.navigate('ConfirmBooking', {
+                                    type: 'doctor',
+                                    doctorId: doc.id,
+                                    doctorName: `${doc.title} ${doc.name}`,
+                                    specialty: selectedSpecialty,
+                                    date: doc.date,
+                                    time: time,
+                                    price: '250.000đ',
+                                    memberId: isOwnerSelected ? undefined : selectedProfile?.realId,
+                                    profileName: selectedProfile?.name,
+                                    profileRelationship: selectedProfile?.relationship,
+                                  });
+                                }}
+                              >
+                                <Text style={styles.timeSlotText}>{time}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}</>
           )}
         </View>
 
@@ -532,7 +532,7 @@ const BookingScreen = ({ route, navigation }: any) => {
       >
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSpecialtyModalVisible(false)}>
           <View style={[styles.modalContent, SHADOWS.card]} onStartShouldSetResponder={() => true}>
-            
+
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn Chuyên khoa</Text>
               <TouchableOpacity onPress={() => setSpecialtyModalVisible(false)} style={styles.modalCloseBtn}>
@@ -559,20 +559,20 @@ const BookingScreen = ({ route, navigation }: any) => {
                   >
                     <View style={styles.specialtyRowLeft}>
                       <View style={[styles.specialtyIconBox, isSelected && styles.specialtyIconBoxActive]}>
-                        <FontAwesome5 
-                          name={item.icon as any} 
-                          size={18} 
-                          color={isSelected ? '#fff' : COLORS.primary} 
+                        <FontAwesome5
+                          name={item.icon as any}
+                          size={18}
+                          color={isSelected ? '#fff' : COLORS.primary}
                         />
                       </View>
                       <Text style={[
-                        styles.specialtyOptionText, 
+                        styles.specialtyOptionText,
                         isSelected && styles.specialtyOptionTextActive
                       ]}>
                         {item.name}
                       </Text>
                     </View>
-                    
+
                     {isSelected && (
                       <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
                     )}
@@ -595,7 +595,7 @@ const BookingScreen = ({ route, navigation }: any) => {
           <View style={[styles.modalContent, SHADOWS.card]} onStartShouldSetResponder={() => true}>
 
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Đặt lịch cho ai?</Text>
+              <Text style={styles.modalTitle}>Chọn</Text>
               <TouchableOpacity onPress={() => setProfileModalVisible(false)} style={styles.modalCloseBtn}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
@@ -609,6 +609,10 @@ const BookingScreen = ({ route, navigation }: any) => {
               renderItem={({ item }) => {
                 const isSelected = (selectedProfile?.id ?? selfProfile?.id) === item.id;
                 const isSelf = item.relationship === 'Bản thân';
+                // Hiển thị giới tính/ngày sinh dưới tên để phân biệt các người thân trùng tên/quan hệ
+                // (vd 2 con cùng để "Con") — áp dụng cho cả "Bản thân" lẫn người thân, lấy thẳng từ
+                // profile.gender/profile.dob (backend đã trả sẵn, dob theo định dạng dd/MM/yyyy).
+                const subInfo = [item.gender, item.dob].filter(Boolean).join(' • ');
                 return (
                   <TouchableOpacity
                     style={[styles.specialtyOption, isSelected && styles.specialtyOptionActive]}
@@ -631,6 +635,7 @@ const BookingScreen = ({ route, navigation }: any) => {
                           {isSelf ? 'Bản thân' : item.name}
                         </Text>
                         {!isSelf && <Text style={styles.profileRelationText}>{item.relationship}</Text>}
+                        {!!subInfo && <Text style={styles.profileRelationText}>{subInfo}</Text>}
                       </View>
                     </View>
 

@@ -311,6 +311,9 @@ const PackagesScreen = ({ route, navigation }: any) => {
                 {(selfProfile ? [selfProfile, ...familyProfiles] : familyProfiles).map((item) => {
                   const isSelected = (selectedProfile?.id ?? selfProfile?.id) === item.id;
                   const isSelf = item.relationship === 'Bản thân';
+                  // Hiển thị giới tính/ngày sinh dưới tên để phân biệt các người thân trùng tên/quan hệ
+                  // — áp dụng cho cả "Bản thân" lẫn người thân, lấy thẳng từ profile.gender/profile.dob.
+                  const subInfo = [item.gender, item.dob].filter(Boolean).join(' • ');
                   return (
                     <TouchableOpacity
                       key={item.id}
@@ -327,6 +330,7 @@ const PackagesScreen = ({ route, navigation }: any) => {
                           {isSelf ? 'Bản thân' : item.name}
                         </Text>
                         {!isSelf && <Text style={[styles.profileOptionRelation, isSelected && { color: '#E0E7FF' }]}>{item.relationship}</Text>}
+                        {!!subInfo && <Text style={[styles.profileOptionRelation, isSelected && { color: '#E0E7FF' }]}>{subInfo}</Text>}
                       </View>
                       {isSelected && <Ionicons name="checkmark-circle" size={22} color="#fff" />}
                     </TouchableOpacity>
