@@ -33,36 +33,6 @@ const generateMonthGrid = (year: number, month: number) => {
   return grid;
 };
 
-const DOCTORS = [
-  {
-    id: 1,
-    title: 'BS. CKI',
-    name: 'NGUYỄN VĂN A',
-    slots: '3 KHUNG GIỜ',
-    date: '26/06/2026',
-    image: 'https://img.freepik.com/free-photo/smiling-asian-male-doctor-with-stethoscope-standing-crossed-arms-looking-camera-confident-medical-professional-clinic-hospital-background_1258-109033.jpg',
-    timeSlots: ['7:30 - 8:30', '8:30 - 9:30', '13:30 - 14:30'],
-  },
-  {
-    id: 2,
-    title: 'BS. CKII',
-    name: 'NGUYỄN VĂN B',
-    slots: '5 KHUNG GIỜ',
-    date: '26/06/2026',
-    image: 'https://img.freepik.com/free-photo/beautiful-young-female-doctor-looking-camera-office_1301-7807.jpg',
-    timeSlots: ['7:30 - 8:30', '8:30 - 9:30', '9:30 - 10:30', '13:30 - 14:30', '15:30 - 16:30'],
-  },
-  {
-    id: 3,
-    title: 'BS.',
-    name: 'NGUYỄN VĂN C',
-    slots: '3 KHUNG GIỜ',
-    date: '26/06/2026',
-    image: 'https://img.freepik.com/free-photo/portrait-successful-mid-adult-doctor-with-crossed-arms_1262-12865.jpg',
-    timeSlots: ['7:30 - 8:30', '8:30 - 9:30', '9:30 - 10:30'],
-  },
-];
-
 // Icon dự phòng theo từ khóa tên chuyên khoa — chỉ dùng để chọn icon hiển thị, KHÔNG dùng để xác
 // định specialtyId (specialtyId giờ lấy trực tiếp từ API, xem apiSpecialties bên dưới).
 const iconForSpecialtyName = (name: string): string => {

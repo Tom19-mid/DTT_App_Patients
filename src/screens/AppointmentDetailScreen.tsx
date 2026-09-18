@@ -245,14 +245,16 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
 
           {/* Trước đây chỉ hiện MỘT LẦN duy nhất trên modal "Đặt lịch thành công" rồi biến mất — không
               xem lại được ở đâu nữa. Hiển thị lại ở đây (backend trả sẵn queueNumber, đã re-đọc từ DB
-              sau khi trigger trg_set_queue_number chạy nên luôn khớp với giá trị thật).
-              Nhãn "Mã khung giờ" (không phải "Số thứ tự") vì giá trị này thực chất là ID cố định của
-              khung giờ 30 phút được đặt (SeedDoctorSchedulesAsync gán cứng 1-8 theo mốc giờ, không đếm
-              theo số bệnh nhân trong ngày) — gọi là "số thứ tự" dễ khiến hiểu nhầm là vị trí xếp hàng. */}
+              sau khi trigger set_queue_number chạy nên luôn khớp với giá trị thật).
+              Từ 2026-09-18, trigger set_queue_number tính lại giá trị này = 1 + số lịch hẹn còn hiệu
+              lực của CÙNG bác sĩ, CÙNG ngày, có giờ hẹn sớm hơn — xuyên suốt mọi ca trong ngày (không
+              còn lấy slot_order riêng theo từng ca như bản seed cũ, tránh trùng số giữa ca sáng/chiều).
+              Giá trị này giờ đúng nghĩa "số thứ tự khám trong ngày" nên đổi nhãn tương ứng (trước đây
+              gọi "Mã khung giờ" vì còn là ID mập mờ theo slot_order riêng từng ca). */}
           {safeApp.queueNumber ? (
             <>
               <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>Mã khung giờ</Text>
+                <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>Số thứ tự khám</Text>
                 <Text style={[styles.infoValueHighlight, isDarkMode && { color: '#F87171' }]}>{safeApp.queueNumber}</Text>
               </View>
               <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />
