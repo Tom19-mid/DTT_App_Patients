@@ -31,7 +31,7 @@ const CLOUD_BASE_URL = "https://dtt-healthcare-api.onrender.com/api";
 // Đặt false nếu muốn quay lại chạy Backend cục bộ (dò IP LAN của máy chạy Expo
 // Metro bundler) để phát triển/debug offline.
 // const USE_CLOUD_BACKEND = true;
-const USE_CLOUD_BACKEND = false;
+const USE_CLOUD_BACKEND = true;
 
 // Tự động nhận diện IP của máy tính đang chạy Expo Metro bundler (chỉ dùng khi
 // USE_CLOUD_BACKEND = false)
