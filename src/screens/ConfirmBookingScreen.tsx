@@ -124,6 +124,27 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
         });
         return;
       }
+
+      // Chặn đặt lịch cho khung giờ đã trôi qua
+      if (date && finalTime) {
+        const parts = date.includes('/') ? date.split('/') : date.split('-');
+        const [startPart] = finalTime.split('-');
+        if (startPart && parts.length === 3) {
+          const dayVal = date.includes('/') ? parseInt(parts[0], 10) : parseInt(parts[2], 10);
+          const monthVal = parseInt(parts[1], 10) - 1;
+          const yearVal = date.includes('/') ? parseInt(parts[2], 10) : parseInt(parts[0], 10);
+          const [hVal, minVal] = startPart.trim().split(':').map(Number);
+          const slotDateTime = new Date(yearVal, monthVal, dayVal, hVal || 0, minVal || 0);
+          if (slotDateTime.getTime() <= Date.now()) {
+            showAlert({
+              title: "Khung giờ không hợp lệ",
+              message: "Khung giờ khám này đã qua so với thời gian hiện tại. Vui lòng chọn khung giờ khám khác hoặc ngày tiếp theo.",
+              type: "error",
+            });
+            return;
+          }
+        }
+      }
     }
     // 2. Kiểm tra với Gói khám
     else if (type === "package") {

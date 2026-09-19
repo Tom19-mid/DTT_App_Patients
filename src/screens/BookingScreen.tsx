@@ -255,8 +255,9 @@ const BookingScreen = ({ route, navigation }: any) => {
         title: doc.degree || 'BS.',
         name: doc.fullName ? doc.fullName.toUpperCase() : 'BÁC SĨ DTT',
         isWorking: doc.isWorking,
+        isOnLeave: doc.isOnLeave,
         statusText: doc.statusText,
-        slots: doc.isWorking ? `${doc.timeSlots.length} ${t('time_slots')}` : 'NGHỈ PHÉP',
+        slots: doc.isWorking ? `${doc.timeSlots.length} ${t('time_slots')}` : (doc.isOnLeave ? 'NGHỈ PHÉP (OFF)' : 'KHÔNG CÓ LỊCH KHÁM'),
         date: dateStr,
         image: 'https://img.freepik.com/free-photo/smiling-asian-male-doctor-with-stethoscope-standing-crossed-arms-looking-camera-confident-medical-professional-clinic-hospital-background_1258-109033.jpg',
         timeSlots: doc.isWorking ? doc.timeSlots : []
@@ -425,7 +426,7 @@ const BookingScreen = ({ route, navigation }: any) => {
                       <Text style={styles.doctorTitle}>{doc.title}</Text>
                       <Text style={styles.doctorName}>{doc.name}</Text>
                       <View style={[styles.slotBadge, doc.isWorking === false && { backgroundColor: '#F1F5F9' }]}>
-                        <Text style={[styles.slotBadgeText, doc.isWorking === false && { color: '#64748B' }]}>{doc.isWorking === false ? 'NGHỈ PHÉP (OFF)' : doc.slots}</Text>
+                        <Text style={[styles.slotBadgeText, doc.isWorking === false && { color: '#64748B' }]}>{doc.isWorking === false ? (doc.isOnLeave ? 'NGHỈ PHÉP (OFF)' : 'KHÔNG CÓ LỊCH KHÁM') : doc.slots}</Text>
                       </View>
                       <Text style={styles.doctorDate}>{doc.date}</Text>
                     </View>
@@ -446,22 +447,43 @@ const BookingScreen = ({ route, navigation }: any) => {
                         <View style={{ paddingVertical: 12, alignItems: 'center' }}>
                           <Ionicons name="calendar-outline" size={24} color="#94A3B8" />
                           <Text style={{ marginTop: 6, fontSize: 13, color: '#64748B', textAlign: 'center' }}>
-                            Bác sĩ {doc.name} nghỉ khám ngày này. Vui lòng chọn ngày khác.
+                            {doc.isOnLeave
+                              ? `Bác sĩ ${doc.name} nghỉ phép ngày này. Vui lòng chọn ngày khác.`
+                              : `Bác sĩ ${doc.name} không có lịch khám ngày này. Vui lòng chọn ngày khác.`}
                           </Text>
                         </View>
                       ) : (
-                        <>
-                          <View style={styles.expandedHeader}>
-                            <Ionicons name="time-outline" size={16} color={COLORS.text} />
-                            <Text style={styles.expandedHeaderText}>Chọn khung giờ khám</Text>
-                          </View>
-                          <View style={styles.slotsGrid}>
-                            {doc.timeSlots && doc.timeSlots.map((time: string, idx: number) => (
+                        (() => {
+                          const now = new Date();
+                          const isSelectedToday = selectedDate.toDateString() === now.toDateString();
+                          const currentHour = now.getHours();
+                          const currentMinute = now.getMinutes();
+
+                          const activeSlots = (doc.timeSlots || []).filter((time: string) => {
+                            if (!isSelectedToday) return true;
+                            const startPart = time.split('-')[0]?.trim();
+                            if (!startPart) return true;
+                            const [h, m] = startPart.split(':').map(Number);
+                            return h > currentHour || (h === currentHour && m > currentMinute);
+                          });
+
+                          const morningSlots = activeSlots.filter((time: string) => {
+                            const startHour = parseInt(time.split('-')[0]?.trim().split(':')[0] || '0', 10);
+                            return startHour < 12;
+                          });
+                          const afternoonSlots = activeSlots.filter((time: string) => {
+                            const startHour = parseInt(time.split('-')[0]?.trim().split(':')[0] || '0', 10);
+                            return startHour >= 12;
+                          });
+
+                          const renderSlotBtn = (time: string, key: string | number) => {
+                            const isOwnerSelected = !selectedProfile || selectedProfile.isOwner || selectedProfile.relationship === 'Bản thân';
+                            return (
                               <TouchableOpacity
-                                key={idx}
+                                key={key}
                                 style={[styles.timeSlotBtn, SHADOWS.input]}
+                                activeOpacity={0.7}
                                 onPress={() => {
-                                  const isOwnerSelected = !selectedProfile || selectedProfile.isOwner || selectedProfile.relationship === 'Bản thân';
                                   navigation.navigate('ConfirmBooking', {
                                     type: 'doctor',
                                     doctorId: doc.id,
@@ -478,9 +500,70 @@ const BookingScreen = ({ route, navigation }: any) => {
                               >
                                 <Text style={styles.timeSlotText}>{time}</Text>
                               </TouchableOpacity>
-                            ))}
-                          </View>
-                        </>
+                            );
+                          };
+
+                          return (
+                            <>
+                              <View style={styles.expandedHeader}>
+                                <Ionicons name="time-outline" size={16} color={COLORS.text} />
+                                <Text style={styles.expandedHeaderText}>Chọn khung giờ khám</Text>
+                              </View>
+
+                              {isSelectedToday && activeSlots.length === 0 && (
+                                <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                                  <Ionicons name="time-outline" size={24} color="#94A3B8" />
+                                  <Text style={{ marginTop: 6, fontSize: 13, color: '#64748B', textAlign: 'center' }}>
+                                    Bác sĩ {doc.name} đã hết khung giờ khám trong ngày hôm nay. Vui lòng chọn ngày tiếp theo.
+                                  </Text>
+                                </View>
+                              )}
+
+                              {/* Ca sáng (07:30 – 11:30) */}
+                              {morningSlots.length > 0 && (
+                                <View style={styles.shiftSection}>
+                                  <View style={styles.shiftLabelRow}>
+                                    <Ionicons name="sunny" size={15} color="#D97706" />
+                                    <Text style={styles.shiftLabelTitle}>Ca sáng (07:30 – 11:30)</Text>
+                                    <View style={[styles.shiftCountBadge, { backgroundColor: '#FEF3C7' }]}>
+                                      <Text style={[styles.shiftCountText, { color: '#B45309' }]}>
+                                        {morningSlots.length} khung giờ
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <View style={styles.slotsGrid}>
+                                    {morningSlots.map((time: string, idx: number) => renderSlotBtn(time, `m-${idx}`))}
+                                  </View>
+                                </View>
+                              )}
+
+                              {/* Ca chiều (13:30 – 16:30) */}
+                              {afternoonSlots.length > 0 && (
+                                <View style={[styles.shiftSection, morningSlots.length > 0 && { marginTop: 14 }]}>
+                                  <View style={styles.shiftLabelRow}>
+                                    <Ionicons name="partly-sunny" size={15} color="#7C3AED" />
+                                    <Text style={[styles.shiftLabelTitle, { color: '#6D28D9' }]}>Ca chiều (13:30 – 16:30)</Text>
+                                    <View style={[styles.shiftCountBadge, { backgroundColor: '#EDE9FE' }]}>
+                                      <Text style={[styles.shiftCountText, { color: '#6D28D9' }]}>
+                                        {afternoonSlots.length} khung giờ
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <View style={styles.slotsGrid}>
+                                    {afternoonSlots.map((time: string, idx: number) => renderSlotBtn(time, `a-${idx}`))}
+                                  </View>
+                                </View>
+                              )}
+
+                              {/* Fallback nếu không chia được ca */}
+                              {morningSlots.length === 0 && afternoonSlots.length === 0 && (
+                                <View style={styles.slotsGrid}>
+                                  {doc.timeSlots && doc.timeSlots.map((time: string, idx: number) => renderSlotBtn(time, `g-${idx}`))}
+                                </View>
+                              )}
+                            </>
+                          );
+                        })()
                       )}
                     </View>
                   )}
@@ -899,6 +982,30 @@ const styles = StyleSheet.create({
   expandedHeaderText: {
     fontSize: 13,
     color: COLORS.text,
+  },
+  shiftSection: {
+    marginBottom: 4,
+  },
+  shiftLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  shiftLabelTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  shiftCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 4,
+  },
+  shiftCountText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   slotsGrid: {
     flexDirection: 'row',
