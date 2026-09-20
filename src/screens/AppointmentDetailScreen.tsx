@@ -46,7 +46,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
   const handleCancel = () => {
     showAlert({
       title: '🗓️ Xác nhận hủy lịch khám',
-      message: `Bạn sắp hủy lịch khám:\n\n🏥 Chuyên khoa: ${safeApp.specialtyKey || '—'}\n⏰ Thời gian: ${safeApp.time || '—'}\n\nThao tác này không thể hoàn tác. Bạn có chắc chắn muốn tiếp tục?`,
+      message: `Bạn sắp hủy lịch khám:\n\n🏥 ${isPkg && safeApp.packageTitle ? 'Gói khám' : 'Chuyên khoa'}: ${safeApp.specialtyKey || '—'}\n⏰ Thời gian: ${safeApp.time || '—'}\n\nThao tác này không thể hoàn tác. Bạn có chắc chắn muốn tiếp tục?`,
       type: 'danger',
       showCancel: true,
       confirmText: 'Hủy lịch',
@@ -205,7 +205,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
         <Text style={[styles.sectionTitle, isDarkMode && { color: '#9CA3AF' }]}>{t('appointment_info_title')}</Text>
         <View style={[styles.card, SHADOWS.card, isDarkMode && { backgroundColor: '#374151' }]}>
           <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{t('specialty')}</Text>
+            <Text style={[styles.infoLabel, isDarkMode && { color: '#9CA3AF' }]}>{isPkg && safeApp.packageTitle ? 'Gói khám' : t('specialty')}</Text>
             <Text style={[styles.infoValueBold, isDarkMode && { color: '#60A5FA' }]}>{t(safeApp.specialtyKey)}</Text>
           </View>
           <View style={[styles.divider, isDarkMode && { backgroundColor: '#4B5563' }]} />

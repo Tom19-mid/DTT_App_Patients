@@ -192,7 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       fullName: name,
       phone: userData.phone || '0909123456',
       email: userData.email || 'user@dtthealthcare.com',
-      verificationStatus: userData.verificationStatus || 'verified',
+      verificationStatus: userData.verificationStatus || 'pending',
       avatarInitials: initials,
     };
 

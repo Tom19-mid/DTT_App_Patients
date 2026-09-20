@@ -13,7 +13,7 @@ import { COLORS, SHADOWS } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useSettings } from '../context/SettingsContext';
-import { prewarmCoreData, apiAppointment, apiHealthPackage, HealthPackage } from '../services/apiService';
+import { prewarmCoreData, apiAppointment, apiHealthPackage, extractPackageTitle, HealthPackage } from '../services/apiService';
 
 // Fallback images for packages without image_url in DB (mirrors PackagesScreen.tsx)
 const PACKAGE_FALLBACK_IMAGES: Record<number, string> = {
@@ -277,6 +277,8 @@ const HomeScreen = ({ navigation }: any) => {
         {/* ── Upcoming Appointment ── */}
         {upcomingAppt && (() => {
           const dateBox = parseApptDateBox(upcomingAppt.date);
+          // Lịch gói khám phải hiện tên gói thay vì chuyên khoa của bác sĩ được gán (và không có dòng bác sĩ).
+          const pkgTitle = upcomingAppt.isPackage ? extractPackageTitle(upcomingAppt) : '';
           return (
             <View>
               <View style={styles.sectionHeader}>
@@ -289,7 +291,8 @@ const HomeScreen = ({ navigation }: any) => {
                   appointment: {
                     ...upcomingAppt,
                     doctor: upcomingAppt.doctorName,
-                    specialtyKey: upcomingAppt.specialtyName,
+                    specialtyKey: pkgTitle || upcomingAppt.specialtyName,
+                    packageTitle: pkgTitle,
                     time: upcomingAppt.timeSlot,
                     displayDate: upcomingAppt.date,
                     dateString: upcomingAppt.date,
@@ -303,11 +306,13 @@ const HomeScreen = ({ navigation }: any) => {
                 </View>
 
                 <View style={styles.appointmentInfo}>
-                  <Text style={[styles.appointmentSpecialty, isDarkMode && { color: '#F3F4F6' }]}>{upcomingAppt.specialtyName || t('general_internal')}</Text>
-                  <View style={styles.appointmentDetailRow}>
-                    <Ionicons name="person-outline" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
-                    <Text style={[styles.appointmentDetailText, isDarkMode && { color: '#9CA3AF' }]}>{t('dr')} {upcomingAppt.doctorName || '—'}</Text>
-                  </View>
+                  <Text style={[styles.appointmentSpecialty, isDarkMode && { color: '#F3F4F6' }]}>{pkgTitle || upcomingAppt.specialtyName || t('general_internal')}</Text>
+                  {upcomingAppt.isPackage ? null : (
+                    <View style={styles.appointmentDetailRow}>
+                      <Ionicons name="person-outline" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
+                      <Text style={[styles.appointmentDetailText, isDarkMode && { color: '#9CA3AF' }]}>{t('dr')} {upcomingAppt.doctorName || '—'}</Text>
+                    </View>
+                  )}
                   <View style={styles.appointmentDetailRow}>
                     <Ionicons name="time-outline" size={12} color={isDarkMode ? '#9CA3AF' : COLORS.placeholder} />
                     <Text style={[styles.appointmentDetailText, isDarkMode && { color: '#9CA3AF' }]}>{upcomingAppt.timeSlot || '—'}</Text>

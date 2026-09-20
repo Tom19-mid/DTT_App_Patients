@@ -6,7 +6,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import DraggableChat from '../components/DraggableChat';
 import { useSettings } from '../context/SettingsContext';
-import { apiAppointment, clearApiCache, PatientAppointmentDto } from '../services/apiService';
+import { apiAppointment, clearApiCache, extractPackageTitle, PatientAppointmentDto } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -131,6 +131,11 @@ const CalendarScreen = ({ navigation }: any) => {
       // đúng lúc AppointmentsController.cs xác định đây thật sự là gói khám (qua Note "Gói khám: ").
       const isPkg = app.isPackage || app.doctorName === '' || false;
 
+      // Lịch gói khám: phần "specialty" tách ở trên chỉ là chuyên khoa của bác sĩ được gán (vd "Nội tổng
+      // quát") — bệnh nhân đặt GÓI khám phải thấy tên gói (xem extractPackageTitle ở apiService).
+      const packageTitle = isPkg ? extractPackageTitle(app) : '';
+      if (packageTitle) specialty = packageTitle;
+
       // Clean doctor name - extract only the name part (remove degree prefix if it contains specialty info)
       let doctor = app.doctorName || '';
       if (isPkg || doctor === 'Gói Khám Sức Khỏe') {
@@ -219,6 +224,7 @@ const CalendarScreen = ({ navigation }: any) => {
         paymentStatus: app.paymentStatus || 'unpaid',
         isUpcoming: isUpcoming,
         isPackage: isPkg,
+        packageTitle,
         // Lịch hẹn đặt cho người thân (memberId khác null) — backend đã resolve đúng patientName/
         // patientGender/patientAge theo hồ sơ người thân đó, không phải chủ tài khoản (xem
         // AppointmentDetailScreen "Thông tin bệnh nhân").

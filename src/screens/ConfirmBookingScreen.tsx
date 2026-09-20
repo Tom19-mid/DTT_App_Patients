@@ -530,12 +530,20 @@ const ConfirmBookingScreen = ({ route, navigation }: any) => {
             <Text style={styles.modalTitle}>Đặt lịch thành công!</Text>
             <Text style={styles.modalMessage}>
               {type === "package"
-                ? `Gói khám "${packageName || "sức khỏe"}" đã được đăng ký thành công vào ngày ${selectedPackageDate} (${selectedPackageTime}).\n\nMã khung giờ của bạn là `
-                : `Lịch khám của bạn đã được ghi nhận trên hệ thống DTT Healthcare vào ngày ${date} (${finalTime}).\n\nMã khung giờ của bạn là `}
-              <Text style={{ fontWeight: "bold", color: COLORS.primary }}>
-                #{bookingResult?.queueNumber || 1}
-              </Text>
-              .
+                ? `Gói khám "${packageName || "sức khỏe"}" đã được đăng ký thành công vào ngày ${selectedPackageDate} (${selectedPackageTime}).`
+                : `Lịch khám của bạn đã được ghi nhận trên hệ thống DTT Healthcare vào ngày ${date} (${finalTime}).`}
+              {/* Backend trả queueNumber đã đọc lại từ DB sau trigger set_queue_number (số thứ tự khám
+                  trong ngày của bác sĩ, tính theo giờ hẹn) — không còn là "mã khung giờ" (slot_order).
+                  Không tự bịa "#1" khi thiếu giá trị: chỉ hiện câu này khi backend thực sự trả về số. */}
+              {bookingResult?.queueNumber ? (
+                <>
+                  {"\n\nSố thứ tự khám của bạn là "}
+                  <Text style={{ fontWeight: "bold", color: COLORS.primary }}>
+                    #{bookingResult.queueNumber}
+                  </Text>
+                  .
+                </>
+              ) : null}
             </Text>
 
             <TouchableOpacity

@@ -380,6 +380,9 @@ export interface PatientAppointmentDto {
   timeSlot: string;
   status: string;
   reason?: string;
+  // Backend trả sẵn (AppointmentResponseDto.Note). Lịch gói khám có dạng
+  // "Gói khám: <tên gói> | <giá> | Khung giờ: ... | Bệnh nhân: ..." — dùng để lấy đúng tên gói.
+  note?: string;
   // Tính thật từ invoices.payment_status ở backend: 'unpaid' | 'partial' | 'paid'
   paymentStatus?: string;
   queueNumber: number;
@@ -395,6 +398,16 @@ export interface PatientAppointmentDto {
   patientGender?: string;
   patientAge?: number;
 }
+
+// Lịch gói khám có reason "<chuyên khoa của bác sĩ được gán> - Gói: <tên gói> - <ngày>" nên phần trước
+// dấu "-" chỉ là tên chuyên khoa (vd "Nội tổng quát"), không phải thứ bệnh nhân đã đặt. Tên gói thật lấy
+// từ Note "Gói khám: <tên gói> | ..." (marker do HealthPackagesController.BookPackage ghi), dự phòng
+// từ reason "Gói: <tên gói> - ...". Trả '' nếu không tách được.
+export const extractPackageTitle = (appt: { note?: string; reason?: string }): string => {
+  const fromNote = appt.note?.match(/Gói khám:\s*([^|]+)/);
+  const fromReason = appt.reason?.match(/Gói:\s*(.+?)\s+-\s+\d/);
+  return (fromNote?.[1] || fromReason?.[1] || "").trim();
+};
 
 // ── Appointment APIs ──────────────────────────────────────────────────────────
 export const apiAppointment = {
