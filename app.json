@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "temp_app",
+    "name": "DTT Healthcare",
     "slug": "temp_app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,14 +13,16 @@
         {
           "cameraPermission": "Ứng dụng cần quyền Camera để quét mã QR trên thẻ bệnh nhân."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.dtt.healthcare",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

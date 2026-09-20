@@ -93,7 +93,7 @@ const RegisterScreen = ({ navigation }: any) => {
 
       if (res.otpCode) {
         console.log('\n======================================================');
-        console.log(`🔑 [DEMO ĐỒ ÁN TỐT NGHIỆP] MÃ OTP ĐĂNG KÝ: ${res.otpCode}`);
+        console.log(`🔑 [DEMO] MÃ OTP ĐĂNG KÝ: ${res.otpCode}`);
         console.log('======================================================\n');
       }
 
@@ -102,7 +102,7 @@ const RegisterScreen = ({ navigation }: any) => {
         message: `Mã xác thực OTP đã được gửi đến số ${trimmedPhone}.\n\nVui lòng nhập mã OTP để hoàn tất đăng ký tài khoản!`,
         type: 'info',
         confirmText: 'Nhập OTP',
-        onConfirm: () => navigation.navigate('OTP', { 
+        onConfirm: () => navigation.navigate('OTP', {
           phone: trimmedPhone,
           purpose: 'register',
           otpCode: res.otpCode
