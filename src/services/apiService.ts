@@ -116,7 +116,9 @@ async function request<T>(
   const cacheKey = `${endpoint}_${JSON.stringify(options.body || "")}`;
 
   // 1. Instant Cache Retrieval (Stale-While-Revalidate 0ms latency)
-  if (isGet && DTTQueryCache.has(cacheKey)) {
+  // customTtl === 0 nghĩa là caller muốn dữ liệu MỚI NHẤT — không được trả bản cache cũ còn hạn do 1 lần gọi
+  // trước (vd prewarm) lưu với TTL mặc định, nếu không "trạng thái xác thực" sẽ kẹt ở giá trị cũ tới 60s.
+  if (isGet && customTtl > 0 && DTTQueryCache.has(cacheKey)) {
     const cached = cacheGet(cacheKey)!;
     const now = Date.now();
     if (now - cached.timestamp < cached.ttl) {
@@ -536,8 +538,14 @@ export interface ProfileDto {
 }
 
 export const apiFamilyMembers = {
-  getByPatient: (patientId: number) =>
-    request<ProfileDto[]>(`/familymembers/patient/${patientId}`),
+  // fresh=true bỏ qua cache (ttl=0) — dùng khi cần trạng thái xác thực MỚI NHẤT sau khi Lễ Tân duyệt CCCD;
+  // nếu không, request() trả ngay bản cache cũ ("Chưa duyệt") dù DB đã "verified".
+  getByPatient: (patientId: number, fresh: boolean = false) =>
+    request<ProfileDto[]>(
+      `/familymembers/patient/${patientId}`,
+      {},
+      fresh ? 0 : DEFAULT_TTL,
+    ),
 
   create: (data: {
     ownerPatientId: number;
@@ -687,6 +695,7 @@ export const apiPatients = {
   // Refresh trạng thái xác thực từ server và cập nhật vào cache
   refreshVerificationStatus: async (patientId: number) => {
     try {
+      // ttl=0: luôn lấy trạng thái mới nhất từ server (không dùng cache "pending" cũ).
       const res = await request<{
         success: boolean;
         patient: {
@@ -694,7 +703,7 @@ export const apiPatients = {
           cccd?: string;
           verificationNote?: string;
         };
-      }>(`/patients/${patientId}`);
+      }>(`/patients/${patientId}`, {}, 0);
       if (res?.success && res.patient) {
         return {
           verified: res.patient.verificationStatus === "verified",

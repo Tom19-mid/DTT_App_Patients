@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Image, Pressable, Alert
@@ -96,7 +97,14 @@ const HomeScreen = ({ navigation }: any) => {
   const [searchVoiceMode, setSearchVoiceMode] = useState(false);
   const [guideMode, setGuideMode] = useState<'guide' | 'medical_info' | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const { isVerified, recentServices, addRecentService, currentUser } = useAuth();
+  const { isVerified, recentServices, addRecentService, currentUser, refreshProfiles } = useAuth();
+
+  // Mỗi lần Trang chủ được focus, làm mới trạng thái xác thực (cổng vào Hồ sơ y tế phụ thuộc isVerified).
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfiles();
+    }, [refreshProfiles]),
+  );
   const { showAlert } = useCustomAlert();
   const { language, setLanguage, isDarkMode, setIsDarkMode, t } = useSettings();
 

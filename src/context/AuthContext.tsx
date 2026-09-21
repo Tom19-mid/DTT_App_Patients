@@ -86,6 +86,10 @@ interface AuthContextType {
   // Tăng dần mỗi khi Hub báo "NotificationsChanged" — màn nào cần tự làm mới danh sách/badge
   // thông báo real-time chỉ cần useEffect theo dõi giá trị này (xem NotificationScreen.tsx).
   notificationsTick: number;
+  // Tải lại danh sách hồ sơ + trạng thái xác thực MỚI NHẤT từ server (bỏ qua cache). Gọi khi màn hình
+  // được focus để bệnh nhân thấy "Đã xác thực" ngay sau khi Lễ Tân đối chiếu CCCD, kể cả khi thông báo
+  // real-time (SignalR) không tới nơi.
+  refreshProfiles: () => Promise<void>;
 }
 
 // Placeholder trước khi đăng nhập (xem PLACEHOLDER_PROFILES ở trên) — patientId=0 là sentinel
@@ -113,6 +117,24 @@ const AuthContext = createContext<AuthContextType>({
   recentServices: [],
   addRecentService: () => {},
   notificationsTick: 0,
+  refreshProfiles: async () => {},
+});
+
+const mapProfileDto = (p: any): PatientProfile => ({
+  id: p.id,
+  realId: p.realId,
+  isOwner: p.isOwner,
+  name: p.name,
+  patientId: p.patientId,
+  relationship: p.relationship,
+  verificationStatus: (p.verificationStatus as VerificationStatus) || 'pending',
+  isVerified: p.isVerified || p.verificationStatus === 'verified',
+  verificationNote: p.verificationNote,
+  dob: p.dob,
+  gender: p.gender,
+  phone: p.phone,
+  cccd: p.cccd,
+  bhyt: p.bhyt,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -146,23 +168,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       apiFamilyMembers.getByPatient(currentUser.patientId)
         .then(res => {
           if (isMounted && res && Array.isArray(res) && res.length > 0) {
-            const loadedProfiles: PatientProfile[] = res.map((p: any) => ({
-              id: p.id,
-              realId: p.realId,
-              isOwner: p.isOwner,
-              name: p.name,
-              patientId: p.patientId,
-              relationship: p.relationship,
-              verificationStatus: (p.verificationStatus as VerificationStatus) || 'pending',
-              isVerified: p.isVerified || p.verificationStatus === 'verified',
-              verificationNote: p.verificationNote,
-              dob: p.dob,
-              gender: p.gender,
-              phone: p.phone,
-              cccd: p.cccd,
-              bhyt: p.bhyt,
-            }));
-            setProfiles(loadedProfiles);
+            setProfiles(res.map(mapProfileDto));
           }
         })
         .catch(err => {
@@ -171,6 +177,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     return () => { isMounted = false; };
   }, [currentUser.patientId]);
+
+  // Tải lại hồ sơ + trạng thái xác thực mới nhất (bỏ qua cache). Trạng thái "Đã xác thực" của chủ tài khoản
+  // chỉ đổi khi nhận sự kiện SignalR hoặc khi vào màn Hồ sơ — nếu Lễ Tân đối chiếu CCCD qua luồng khác
+  // (vd "Khám Trực Tiếp") hoặc kết nối real-time chập chờn, tab "Cá nhân"/Trang chủ vẫn hiện "Chưa duyệt"
+  // cũ. Hàm này cho các màn hình gọi lại mỗi khi được focus.
+  const refreshProfiles = useCallback(async () => {
+    const pid = currentUser?.patientId;
+    if (!pid) return;
+    try {
+      const res = await apiFamilyMembers.getByPatient(pid, true);
+      if (!Array.isArray(res) || res.length === 0) return;
+      const loaded = res.map(mapProfileDto);
+      setProfiles(loaded);
+      const owner = loaded.find(p => p.isOwner);
+      if (owner) {
+        setIsVerified(!!owner.isVerified);
+        setCurrentUser(prev => prev.verificationStatus === owner.verificationStatus
+          ? prev
+          : { ...prev, verificationStatus: owner.verificationStatus });
+      }
+    } catch (err) {
+      console.log('[AuthContext] refreshProfiles failed:', err);
+    }
+  }, [currentUser?.patientId]);
 
   const login = useCallback((userData: any) => {
     const name = userData.fullName || 'Người Dùng';
@@ -345,8 +375,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<AuthContextType>(() => ({
     currentUser, setCurrentUser, login, logout,
     isVerified, setIsVerified, profiles, addProfile, updateProfile, deleteProfile,
-    recentServices, addRecentService, notificationsTick
-  }), [currentUser, login, logout, isVerified, profiles, addProfile, updateProfile, deleteProfile, recentServices, addRecentService, notificationsTick]);
+    recentServices, addRecentService, notificationsTick, refreshProfiles
+  }), [currentUser, login, logout, isVerified, profiles, addProfile, updateProfile, deleteProfile, recentServices, addRecentService, notificationsTick, refreshProfiles]);
 
   return (
     <AuthContext.Provider value={value}>

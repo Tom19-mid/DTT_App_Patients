@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, SafeAreaView, Alert, Switch } from 'react-native';
 import { Ionicons, FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../constants/theme';
@@ -8,9 +9,17 @@ import { useSettings } from '../context/SettingsContext';
 import DraggableChat from '../components/DraggableChat';
 
 const ProfileScreen = ({ navigation }: any) => {
-  const { isVerified, setIsVerified, profiles, logout } = useAuth();
+  const { isVerified, setIsVerified, profiles, logout, refreshProfiles } = useAuth();
   const { showAlert } = useCustomAlert();
   const { isDarkMode, t } = useSettings();
+
+  // Mỗi lần mở tab "Cá nhân" tải lại trạng thái xác thực mới nhất từ server — nếu Lễ Tân vừa đối chiếu
+  // CCCD (kể cả qua "Khám Trực Tiếp") thì bệnh nhân thấy "Đã xác thực" ngay, không kẹt ở "Chưa duyệt".
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfiles();
+    }, [refreshProfiles]),
+  );
 
   const primaryProfile = profiles.find(p => p.relationship === 'Bản thân') || profiles[0];
 
