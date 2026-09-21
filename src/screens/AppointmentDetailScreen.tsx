@@ -38,10 +38,17 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
   const isAwaitingResults = safeApp.status === 'AwaitingTestResults' || safeApp.statusKey === 'awaiting_test_results' || safeApp.statusId === 9;
   // Bệnh nhân đang chờ nhận thuốc tại quầy Dược
   const isPendingDispensing = safeApp.status === 'PendingDispensing' || safeApp.statusKey === 'pending_dispensing' || safeApp.statusId === 10;
+  // Bác sĩ đã khám xong, bệnh nhân cần thanh toán tại Quầy Thu Ngân (StatusId=11) — trước đây không được nhận diện,
+  // màn này hiện nhầm "Vui lòng đến trước 15 phút để làm thủ tục tiếp đón" cho bệnh nhân đã khám xong.
+  const isPendingPayment = safeApp.status === 'PendingPayment' || safeApp.statusKey === 'pending_payment' || safeApp.statusId === 11;
   // Trước đây màn này không check Cancelled, nên lịch đã hủy mở từ lịch sử luôn hiện "Hoàn thành"
   // giống lịch khám bình thường (CalendarScreen ở danh sách thì map đúng, chỉ màn chi tiết bị bỏ sót).
   const isCancelled = safeApp.status === 'Cancelled' || safeApp.status === 'cancelled' || safeApp.statusKey === 'cancelled' || safeApp.statusId === 5;
   const isNoShow = safeApp.status === 'NoShow' || safeApp.status === 'noshow' || safeApp.statusKey === 'noshow' || safeApp.statusId === 6;
+
+  // Mã tiếp nhận THẬT: RX-{năm khám}-{mã lịch hẹn 4 chữ số}, khớp với màn Lễ tân WinForms.
+  const receptionYear = /^\d{4}/.test(String(safeApp.dateString || '')) ? String(safeApp.dateString).slice(0, 4) : String(new Date().getFullYear());
+  const receptionCode = safeApp.id ? `RX-${receptionYear}-${String(safeApp.id).padStart(4, '0')}` : '—';
 
   const handleCancel = () => {
     showAlert({
@@ -130,6 +137,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
                 isCancelled ? "close-circle" :
                 isNoShow ? "alert-circle" :
                 isAwaitingResults ? "flask" :
+                isPendingPayment ? "card" :
                 isPendingDispensing ? "medkit" :
                 isInProgress ? "pulse" :
                 isWaitingForDoctor ? "fitness" :
@@ -141,6 +149,7 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
                 isCancelled ? "#EF4444" :
                 isNoShow ? "#F97316" :
                 isAwaitingResults ? "#7C3AED" :
+                isPendingPayment ? "#F59E0B" :
                 isPendingDispensing ? "#F59E0B" :
                 isInProgress ? "#6366F1" :
                 isWaitingForDoctor ? "#8B5CF6" :
@@ -155,15 +164,17 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
             isNoShow && { color: "#F97316" },
             isAwaitingResults && { color: "#7C3AED" },
             isPendingDispensing && { color: "#F59E0B" },
+            isPendingPayment && { color: "#F59E0B" },
             isInProgress && { color: "#6366F1" },
             isWaitingForDoctor && { color: "#8B5CF6" },
             isCheckedIn && { color: "#10B981" },
-            isHistory && !isCancelled && !isNoShow && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && !isPendingDispensing && { color: isDarkMode ? '#60A5FA' : COLORS.primary },
-            !isHistory && !isCancelled && !isNoShow && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && !isPendingDispensing && isDarkMode && { color: '#34D399' }
+            isHistory && !isCancelled && !isNoShow && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && !isPendingDispensing && !isPendingPayment && { color: isDarkMode ? '#60A5FA' : COLORS.primary },
+            !isHistory && !isCancelled && !isNoShow && !isInProgress && !isWaitingForDoctor && !isCheckedIn && !isAwaitingResults && !isPendingDispensing && !isPendingPayment && isDarkMode && { color: '#34D399' }
           ]}>
             {isCancelled ? "Đã hủy lịch khám" :
              isNoShow ? "Không Đến Khám" :
              isAwaitingResults ? "Đang chờ kết quả Xét nghiệm/Siêu âm" :
+             isPendingPayment ? "Chờ Thanh Toán" :
              isPendingDispensing ? "Đang Chờ Phát Thuốc" :
              isInProgress ? (t('in_progress') !== 'in_progress' ? t('in_progress') : "Đang khám lâm sàng") :
              isWaitingForDoctor ? "Đã đo sinh hiệu — Chờ khám" :
@@ -177,6 +188,8 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
               ? "Bạn đã không đến khám theo lịch hẹn này. Vui lòng đặt lại lịch khám mới nếu vẫn có nhu cầu khám bệnh."
               : isAwaitingResults
               ? "Bác sĩ đã chỉ định Xét nghiệm/Siêu âm cho bạn. Vui lòng di chuyển đến phòng Cận Lâm Sàng và chờ Kỹ thuật viên gọi tên."
+              : isPendingPayment
+              ? "Bác sĩ đã hoàn tất khám cho bạn. Vui lòng đến Quầy Thu Ngân thanh toán viện phí (và tiền thuốc nếu có), sau đó sang quầy Dược nhận thuốc."
               : isPendingDispensing
               ? "Bác sĩ đã kê đơn thuốc cho bạn. Vui lòng di chuyển đến quầy Dược và chờ Dược sĩ gọi tên để nhận thuốc."
               : isInProgress
@@ -194,11 +207,13 @@ const AppointmentDetailScreen = ({ route, navigation }: any) => {
         {/* QR Code Section */}
         <View style={[styles.card, SHADOWS.card, { alignItems: 'center' }, isDarkMode && { backgroundColor: '#374151' }]}>
           <Text style={[styles.qrTitle, isDarkMode && { color: '#9CA3AF' }]}>{t('reception_code')}</Text>
-          {/* Mock QR Code */}
+          {/* Trước đây ở đây là 1 biểu tượng QR giả (không quét được) kèm mã cứng "DTT-20260726-001" cho MỌI lịch hẹn.
+              Giờ hiện đúng MÃ TIẾP NHẬN THẬT của lịch hẹn — cùng định dạng RX-{năm}-{mã lịch hẹn} mà màn Lễ tân WinForms hiển
+              thị và cho phép tra cứu ("Tìm bệnh nhân / SĐT / Mã lịch hẹn"). */}
           <View style={[styles.qrCodePlaceholder, isDarkMode && { backgroundColor: '#F3F4F6' }]}>
-            <Ionicons name="qr-code-outline" size={120} color={COLORS.text} />
+            <Text style={[styles.qrCodeText, { fontSize: 28 }]}>{receptionCode}</Text>
           </View>
-          <Text style={[styles.qrCodeText, isDarkMode && { color: '#F3F4F6' }]}>DTT-20260726-001</Text>
+          <Text style={[styles.qrTitle, { marginBottom: 0 }, isDarkMode && { color: '#9CA3AF' }]}>Đọc mã này cho Lễ tân khi làm thủ tục tiếp đón</Text>
         </View>
 
         {/* Appointment Info */}

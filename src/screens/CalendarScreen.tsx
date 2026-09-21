@@ -200,6 +200,12 @@ const CalendarScreen = ({ navigation }: any) => {
         statusKey = 'pending_dispensing';
         statusColor = '#F59E0B'; // Amber — cùng nhóm màu "đang chờ" như awaiting_test_results
         isUpcoming = true;
+      } else if (app.status === 'PendingPayment' || app.status === 'pending_payment') {
+        // Bác sĩ đã khám xong, bệnh nhân cần thanh toán viện phí/tiền thuốc tại Quầy Thu Ngân (StatusId=11).
+        // Trước đây trạng thái này không được nhận diện → rơi về 'confirmed' và hiện như lịch sắp tới chưa đến khám.
+        statusKey = 'pending_payment';
+        statusColor = '#F59E0B';
+        isUpcoming = true;
       }
 
       // Format display date to DD/MM/YYYY for user-friendly display
@@ -565,7 +571,7 @@ const CalendarScreen = ({ navigation }: any) => {
                     <View style={styles.statusBadge}>
                       <View style={[styles.statusDot, { backgroundColor: app.statusColor }]} />
                       <Text style={[styles.statusText, { color: app.statusColor }]}>
-                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'checked_in' ? 'Đã Check-in tại quầy' : app.statusKey === 'waiting_for_doctor' ? 'Đã đo sinh hiệu (Chờ khám)' : app.statusKey === 'awaiting_test_results' ? 'Đang chờ kết quả CLS' : app.statusKey === 'pending_dispensing' ? 'Chờ Phát Thuốc' : app.statusKey === 'completed' ? 'Hoàn thành' : app.statusKey === 'in_progress' ? 'Đang khám' : app.statusKey === 'noshow' ? 'Bỏ khám (Quá hạn)' : 'Đã hủy')}
+                        {t(app.statusKey) !== app.statusKey ? t(app.statusKey) : (app.statusKey === 'confirmed' ? 'Đã xác nhận' : app.statusKey === 'checked_in' ? 'Đã Check-in tại quầy' : app.statusKey === 'waiting_for_doctor' ? 'Đã đo sinh hiệu (Chờ khám)' : app.statusKey === 'awaiting_test_results' ? 'Đang chờ kết quả CLS' : app.statusKey === 'pending_dispensing' ? 'Chờ Phát Thuốc' : app.statusKey === 'pending_payment' ? 'Chờ thanh toán' : app.statusKey === 'completed' ? 'Hoàn thành' : app.statusKey === 'in_progress' ? 'Đang khám' : app.statusKey === 'noshow' ? 'Bỏ khám (Quá hạn)' : 'Đã hủy')}
                       </Text>
                     </View>
                   </View>

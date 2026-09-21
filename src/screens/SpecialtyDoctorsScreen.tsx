@@ -55,10 +55,16 @@ const SpecialtyDoctorsScreen = ({ route, navigation }: any) => {
           return {
             id: d.doctorId,
             name: d.fullName || 'Bác sĩ DTT',
-            title: d.degree || 'ThS. Bác sĩ',
-            rating: d.rating || 5.0,
-            reviews: d.reviewCount || 10,
-            bio: `${displayName} có ${d.experienceYears || 10} năm kinh nghiệm công tác tại ${d.clinicRoom || 'Phòng khám'}.\n• Lịch trực thường niên: ${d.workingDaysText || 'Thứ Hai đến Thứ Bảy'}.\n• Chuyên sâu khám và tư vấn điều trị các bệnh lý ${specialty.name || 'chuyên khoa'}.`,
+            // Không bịa số liệu khi hồ sơ chưa có (trước đây: học vị "ThS.", đánh giá 5.0 sao, 10 lượt đánh giá,
+            // 10 năm kinh nghiệm, lịch trực "Thứ Hai đến Thứ Bảy") — chỉ hiện những gì backend thật sự có.
+            title: d.degree || 'Bác sĩ',
+            rating: d.rating || 0,
+            reviews: d.reviewCount || 0,
+            bio: [
+              `${displayName}${d.experienceYears ? ` có ${d.experienceYears} năm kinh nghiệm` : ''}${d.clinicRoom ? `, phòng khám: ${d.clinicRoom}` : ''}.`,
+              `• Lịch trực trong 4 tuần tới: ${d.workingDaysText || 'chưa có lịch trực'}.`,
+              `• Khám và tư vấn điều trị các bệnh lý ${specialty.name || 'chuyên khoa'}.`,
+            ].join('\n'),
             schedule: [
               { dateLabel: `Hôm nay, ${toDisplayDateStr(today)}`, dateValue: toDisplayDateStr(today), slots: slotsToday },
               { dateLabel: `Ngày mai, ${toDisplayDateStr(tomorrow)}`, dateValue: toDisplayDateStr(tomorrow), slots: slotsTomorrow }
